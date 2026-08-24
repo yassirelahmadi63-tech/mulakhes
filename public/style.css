@@ -148,6 +148,52 @@ input:focus, select:focus, textarea:focus {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ============ الاختبار الذاتي ============ */
+.quiz-head {
+  font-family: "Cairo", sans-serif; font-weight: 900; font-size: 1.05rem;
+  color: var(--primary-dark); background: var(--primary-soft);
+  border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; text-align: center;
+}
+.quiz-q {
+  border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 14px; background: #fafbfe;
+}
+.quiz-qtitle { font-weight: 700; margin-bottom: 10px; font-size: 1rem; }
+.quiz-opts { display: flex; flex-direction: column; gap: 8px; }
+.quiz-opt {
+  font-family: inherit; font-size: 0.95rem; text-align: start;
+  background: #fff; border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; cursor: pointer; transition: all 0.15s; color: var(--text);
+}
+.quiz-opt:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-soft); }
+.quiz-opt.correct { background: #ecfdf5; border-color: #34d399; color: #065f46; font-weight: 700; }
+.quiz-opt.wrong { background: #fef2f2; border-color: #f87171; color: #991b1b; }
+.quiz-opt:disabled { cursor: default; opacity: 0.9; }
+.quiz-explain {
+  margin-top: 10px; background: #fffbeb; border: 1px solid #fde68a;
+  color: #92400e; border-radius: 10px; padding: 8px 12px; font-size: 0.88rem;
+}
+.quiz-score {
+  background: var(--grad); color: #fff; border-radius: 14px;
+  padding: 16px; text-align: center; font-size: 1.15rem;
+  font-family: "Cairo", sans-serif; font-weight: 700;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+}
+.quiz-actions { margin-top: 14px; text-align: center; }
+
+/* ============ تصنيف المواد ============ */
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-chips .chip {
+  font-family: inherit; font-size: 0.85rem; font-weight: 700;
+  background: #f1f3f9; color: var(--muted);
+  border: 1.5px solid transparent; border-radius: 999px;
+  padding: 6px 16px; cursor: pointer; transition: all 0.2s;
+}
+.filter-chips .chip:hover { color: var(--primary); }
+.filter-chips .chip.active { background: var(--primary); color: #fff; box-shadow: 0 3px 10px rgba(79,70,229,.3); }
+.subject-tag { background: var(--primary-soft); color: var(--primary-dark); border-radius: 6px; padding: 1px 8px; font-size: 0.78rem; font-weight: 700; }
+.save-bar input { flex: 1; min-width: 0; }
 .save-bar { display: flex; gap: 8px; margin-bottom: 16px; padding: 12px; background: var(--primary-soft); border-radius: 12px; }
 .save-bar input { flex: 1; }
 .summary-output { white-space: pre-wrap; line-height: 2; font-size: 1.02rem; animation: fadeUp 0.4s ease; }
