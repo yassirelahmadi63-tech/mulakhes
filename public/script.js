@@ -480,17 +480,25 @@ async function loadPlansPage() {
 }
 
 function renderPlansGrid(plans) {
+  const maxPrice = Math.max(...plans.map((p) => Number(p.price) || 0), 0);
   els.plansGrid.innerHTML = plans
     .map((p) => {
       const isCurrent = mySub?.active && mySub?.plan_id === p.id;
+      const featured = (Number(p.price) || 0) === maxPrice && maxPrice > 0;
       return `
-      <div class="plan-card ${isCurrent ? "current" : ""}">
+      <div class="plan-card ${featured ? "featured" : ""} ${isCurrent ? "current" : ""}">
+        ${featured ? '<span class="plan-badge">⭐ الأفضل قيمة</span>' : ""}
+        ${isCurrent ? '<span class="plan-badge current-badge">✓ باقتك الحالية</span>' : ""}
         <span class="plan-name">${escapeHtml(p.name)}</span>
-        <span class="plan-price">${escapeHtml(p.price || "0")} <small style="font-size:.85rem;color:var(--muted)">${p.price ? "د.م" : ""}</small></span>
-        <span class="plan-ai">🤖 ذكاء ${modelStrength(p.model)}</span>
-        <span class="plan-feat">⏳ ${p.days} يوم</span>
-        <span class="plan-feat">${p.summaries === -1 ? "♾️ ملخصات غير محدودة" : `📝 ${p.summaries} ملخص`}</span>
-        <button class="btn btn-primary" type="button" data-request-plan="${p.id}">${isCurrent ? "تجديد / تمديد" : "طلب اشتراك"}</button>
+        <div class="plan-price">${escapeHtml(p.price || "0")}<small> د.م</small></div>
+        <span class="plan-ai">🤖 ذكاء اصطناعي ${modelStrength(p.model)}</span>
+        <ul class="plan-feats">
+          <li>⏳ صلاحية ${p.days} يوم</li>
+          <li>${p.summaries === -1 ? "♾️ ملخصات غير محدودة" : `📝 حتى ${p.summaries} ملخص`}</li>
+          <li>✓ حفظ في مكتبتك الخاصة</li>
+          <li>✓ مثالي للمراجعة قبل الامتحانات</li>
+        </ul>
+        <button class="btn ${featured ? "btn-primary" : "btn-ghost"} plan-cta" type="button" data-request-plan="${p.id}">${isCurrent ? "تجديد / تمديد" : "طلب اشتراك"}</button>
       </div>`;
     })
     .join("");
