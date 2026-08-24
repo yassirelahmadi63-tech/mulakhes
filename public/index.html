@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مُلخِّص الدروس</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" type="image/png" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="مُلخِّص">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- شاشة تسجيل الدخول -->
+  <div id="authScreen" class="auth-screen hidden">
+    <div class="auth-card card">
+      <div class="logo">
+        <span class="logo-icon">📚</span>
+        <h1>مُلخِّص الدروس</h1>
+      </div>
+      <p class="auth-subtitle">أنشئ حساباً أو سجّل دخولك للبدء</p>
+
+      <div class="segmented auth-tabs">
+        <button type="button" id="tabLogin" class="active">تسجيل الدخول</button>
+        <button type="button" id="tabRegister">حساب جديد</button>
+      </div>
+
+      <div class="form-row" id="nameRow" hidden>
+        <label for="authName">الاسم</label>
+        <input type="text" id="authName" placeholder="اسمك..." autocomplete="name">
+      </div>
+      <div class="form-row">
+        <label for="authEmail">البريد الإلكتروني</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" dir="ltr">
+      </div>
+      <div class="form-row">
+        <label for="authPassword">كلمة المرور</label>
+        <input type="password" id="authPassword" placeholder="6 أحرف على الأقل" autocomplete="current-password" dir="ltr">
+      </div>
+
+      <p id="authMsg" class="status hidden"></p>
+
+      <button id="authSubmitBtn" class="btn btn-primary btn-lg auth-btn" type="button">دخول</button>
+
+      <div id="googleSection" class="google-section hidden">
+        <div class="divider"><span>أو</span></div>
+        <div id="googleBtn" class="google-btn-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- التطبيق: لوحة تحكم -->
+  <div id="app" class="app-layout hidden">
+
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span>📚</span>
+        <b>مُلخِّص الدروس</b>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-btn active" data-page="summarize" type="button">✨ <span>تلخيص درس</span></button>
+        <button class="nav-btn" data-page="library" type="button">📚 <span>مكتبتي</span> <i id="navLibCount" class="nav-badge hidden">0</i></button>
+        <button class="nav-btn" data-page="plans" type="button">💳 <span>الباقات</span></button>
+        <button class="nav-btn admin-only hidden" data-page="admin" type="button">🛡️ <span>لوحة الإدارة</span></button>
+      </nav>
+
+      <div class="sidebar-user">
+        <div id="userName" class="side-user-name">👤</div>
+        <div id="subChip" class="sub-chip sub-free">...</div>
+        <button id="logoutBtn" class="btn-logout" type="button">تسجيل الخروج</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- صفحة التلخيص -->
+      <section id="page-summarize" class="page active">
+        <div class="split">
+          <div class="card">
+            <div class="card-head">
+              <h2>📝 نص الدرس</h2>
+              <span id="wordCount" class="badge">0 كلمة</span>
+            </div>
+            <textarea id="lessonText" rows="12" placeholder="الصق نص الدرس هنا... أو ارفع ملفاً"></textarea>
+            <div class="toolbar">
+              <label class="btn btn-ghost" for="fileInput">📄 رفع ملف<input type="file" id="fileInput" accept=".txt,.md,text/*" hidden></label>
+              <button id="clearBtn" class="btn btn-ghost" type="button">🗑️ مسح</button>
+            </div>
+            <div class="options">
+              <div class="option-group">
+                <span class="option-label">الطول:</span>
+                <div class="segmented" id="lengthOptions">
+                  <button type="button" data-length="short">قصير</button>
+                  <button type="button" data-length="medium" class="active">متوسط</button>
+                  <button type="button" data-length="detailed">مفصّل</button>
+                </div>
+              </div>
+              <label class="checkbox-label">
+                <input type="checkbox" id="bulletsMode" checked> نقاط مرتبة
+              </label>
+            </div>
+            <button id="summarizeBtn" class="btn btn-primary btn-lg" type="button">✨ لخِّص الدرس الآن</button>
+            <p id="statusMsg" class="status hidden"></p>
+          </div>
+
+          <div class="card result-card hidden" id="resultCard">
+            <div class="card-head">
+              <h2>💡 الملخص</h2>
+              <div class="result-actions">
+                <button id="saveBtn" class="btn btn-ghost" type="button">💾 حفظ</button>
+                <button id="copyBtn" class="btn btn-ghost" type="button">📋 نسخ</button>
+                <button id="downloadBtn" class="btn btn-ghost" type="button">⬇️ تنزيل</button>
+              </div>
+            </div>
+            <div id="saveBar" class="save-bar hidden">
+              <input type="text" id="saveTitleInput" placeholder="اسم الدرس..." maxlength="80">
+              <button id="saveConfirmBtn" class="btn btn-primary" type="button">تأكيد</button>
+              <button id="saveCancelBtn" class="btn btn-ghost" type="button">إلغاء</button>
+            </div>
+            <div id="summaryOutput" class="summary-output"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- صفحة المكتبة -->
+      <section id="page-library" class="page">
+        <div class="card">
+          <div class="card-head">
+            <h2>📚 مكتبتي</h2>
+            <span id="libCount" class="badge">0 درس</span>
+          </div>
+          <p id="libraryEmpty" class="library-empty">لا توجد دروس محفوظة بعد.</p>
+          <ul id="libList" class="lib-list"></ul>
+        </div>
+      </section>
+
+      <!-- صفحة الباقات -->
+      <section id="page-plans" class="page">
+        <div class="card">
+          <div class="card-head">
+            <h2>💳 باقات الاشتراك</h2>
+            <span id="myQuota" class="badge"></span>
+          </div>
+          <p class="plans-intro">كل باقة أقوى ذكاءً من سابقتها. اختر باقة وأرسل طلبك، وسيراجعها المدير.</p>
+          <div id="plansGrid" class="plans-grid"></div>
+
+          <h3 class="admin-subtitle">📨 طلباتي</h3>
+          <p id="myRequestsEmpty" class="library-empty">لا توجد طلبات.</p>
+          <ul id="myRequests" class="lib-list"></ul>
+        </div>
+      </section>
+
+      <!-- لوحة الإدارة -->
+      <section id="page-admin" class="page">
+        <div class="card">
+          <div class="card-head"><h2>🛡️ لوحة الإدارة</h2></div>
+          <div class="stats-grid">
+            <div class="stat-box"><span class="stat-num" id="statUsers">0</span><span class="stat-label">مستخدم</span></div>
+            <div class="stat-box"><span class="stat-num" id="statSubs">0</span><span class="stat-label">اشتراك نشط</span></div>
+            <div class="stat-box"><span class="stat-num" id="statLessons">0</span><span class="stat-label">ملخص محفوظ</span></div>
+          </div>
+
+          <h3 class="admin-subtitle">📨 طلبات الاشتراك المعلقة</h3>
+          <p id="reqEmpty" class="library-empty">لا توجد طلبات معلقة.</p>
+          <ul id="adminRequests" class="lib-list"></ul>
+
+          <h3 class="admin-subtitle">💳 خطط الاشتراك</h3>
+          <ul id="plansList" class="lib-list"></ul>
+          <div class="plan-form">
+            <input type="text" id="planName" placeholder="اسم الخطة" maxlength="30">
+            <input type="number" id="planDays" placeholder="أيام" min="1" style="max-width:80px">
+            <input type="number" id="planSummaries" placeholder="ملخصات (-1=∞)" min="-1" style="max-width:150px">
+            <select id="planModel" style="max-width:200px"></select>
+            <input type="text" id="planPrice" placeholder="السعر" maxlength="15" style="max-width:90px">
+            <button id="addPlanBtn" class="btn btn-primary" type="button">إضافة</button>
+          </div>
+
+          <h3 class="admin-subtitle">👥 المستخدمون</h3>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>الدور</th><th>الاشتراك</th><th>إدارة الاشتراك</th><th>إجراءات</th></tr></thead>
+              <tbody id="adminUsersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>
