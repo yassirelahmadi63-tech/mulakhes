@@ -98,6 +98,9 @@
         <button id="logoutBtnM" class="btn-logout" type="button">خروج</button>
       </div>
 
+      <!-- إعلان المدير -->
+      <div id="announcementBar" class="announcement hidden"></div>
+
       <!-- صفحة التلخيص -->
       <section id="page-summarize" class="page active">
         <div class="split">
@@ -245,11 +248,25 @@
           <button id="savePaymentBtn" class="btn btn-primary" type="button" style="margin-top:8px">حفظ التعليمات</button>
 
           <h3 class="admin-subtitle">👥 المستخدمون</h3>
+          <div class="admin-toolbar">
+            <button id="exportCsvBtn" class="btn btn-ghost" type="button">⬇️ تصدير CSV</button>
+          </div>
           <div class="table-wrap">
             <table class="admin-table">
               <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>الدور</th><th>الاشتراك</th><th>إدارة الاشتراك</th><th>إجراءات</th></tr></thead>
               <tbody id="adminUsersBody"></tbody>
             </table>
+          </div>
+
+          <h3 class="admin-subtitle">📚 مكتبة المستخدم المحدد</h3>
+          <p id="adminLibHint" class="library-empty">اضغط 📚 بجانب أي مستخدم لعرض دروسه.</p>
+          <ul id="adminLibList" class="lib-list"></ul>
+
+          <h3 class="admin-subtitle">📢 إعلان عام (يظهر لجميع المستخدمين)</h3>
+          <textarea id="announcementAdmin" rows="2" placeholder="مثال: خصم 20% على الباقة الاحترافية هذا الأسبوع!"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="saveAnnBtn" class="btn btn-primary" type="button">نشر الإعلان</button>
+            <button id="clearAnnBtn" class="btn btn-ghost" type="button">حذف الإعلان</button>
           </div>
         </div>
       </section>
