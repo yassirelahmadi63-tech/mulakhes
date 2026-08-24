@@ -35,6 +35,9 @@ const els = {
   statusMsg: $("statusMsg"),
   resultCard: $("resultCard"),
   summaryOutput: $("summaryOutput"),
+  quizBtn: $("quizBtn"),
+  libFilters: $("libFilters"),
+  saveSubjectInput: $("saveSubjectInput"),
   saveBtn: $("saveBtn"),
   saveBar: $("saveBar"),
   saveTitleInput: $("saveTitleInput"),
@@ -77,6 +80,8 @@ let token = localStorage.getItem("token") || "";
 let currentUser = null;
 let summaryLength = "medium";
 let lastSummary = "";
+let lastQuiz = null;
+let currentLibFilter = "";
 let modelLabels = {};
 let adminPlans = [];
 let mySub = null;
@@ -379,6 +384,95 @@ function renderSummary(markdown) {
   els.resultCard.classList.remove("hidden");
 }
 
+/* ---------- الاختبار الذاتي ---------- */
+
+els.quizBtn.addEventListener("click", async () => {
+  const text = els.lessonText.value.trim();
+  if (!text) return showStatus("لا يوجد نص درس لإنشاء الأسئلة.", "error");
+  els.quizBtn.disabled = true;
+  showStatus("جارٍ إنشاء الأسئلة...", "loading", true);
+  try {
+    const data = await api("/quiz", {
+      method: "POST",
+      body: JSON.stringify({ text, count: 5 }),
+    });
+    lastQuiz = data.questions;
+    if (data.subscription) renderSubChip(data.subscription);
+    renderQuiz(data.questions);
+    showStatus(`تم إنشاء ${data.questions.length} أسئلة ✓ 🤖 ${data.model_used || ""}`, "success");
+  } catch (err) {
+    if (err.code === "QUOTA") {
+      showStatus(`⭐ ${err.message}`, "error");
+      showPage("plans");
+    } else showStatus(err.message, "error");
+  } finally {
+    els.quizBtn.disabled = false;
+  }
+});
+
+function renderQuiz(questions) {
+  lastQuiz = questions;
+  const html = [
+    '<div class="quiz-wrap">',
+    '<div class="quiz-head">🧪 اختبار ذاتي — أجب على جميع الأسئلة</div>',
+  ];
+  questions.forEach((q, qi) => {
+    html.push(`<div class="quiz-q" data-qi="${qi}">`);
+    html.push(`<div class="quiz-qtitle">${qi + 1}. ${escapeHtml(q.q)}</div>`);
+    html.push('<div class="quiz-opts">');
+    (q.options || []).forEach((opt, oi) => {
+      html.push(`<button type="button" class="quiz-opt" data-qi="${qi}" data-oi="${oi}">${escapeHtml(opt)}</button>`);
+    });
+    html.push("</div>");
+    html.push(`<div class="quiz-explain hidden" data-explain="${qi}"></div>`);
+    html.push("</div>");
+  });
+  html.push('<div id="quizScore" class="quiz-score hidden"></div>');
+  html.push('<div class="quiz-actions"><button type="button" class="btn btn-ghost" id="quizBackBtn">↩️ رجوع للملخص</button></div>');
+  html.push("</div>");
+  els.summaryOutput.innerHTML = html.join("");
+  els.resultCard.classList.remove("hidden");
+  els.resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+els.summaryOutput.addEventListener("click", (e) => {
+  if (e.target.id === "quizBackBtn") {
+    if (lastSummary) renderSummary(lastSummary);
+    return;
+  }
+  const opt = e.target.closest(".quiz-opt");
+  if (!opt || !lastQuiz) return;
+  const qi = Number(opt.dataset.qi);
+  const oi = Number(opt.dataset.oi);
+  const qEl = opt.closest(".quiz-q");
+  if (qEl.dataset.done === "1") return;
+  qEl.dataset.done = "1";
+  const correct = Number(lastQuiz[qi]?.answer);
+  qEl.querySelectorAll(".quiz-opt").forEach((b) => {
+    const idx = Number(b.dataset.oi);
+    if (idx === correct) b.classList.add("correct");
+    else if (idx === oi) b.classList.add("wrong");
+    b.disabled = true;
+  });
+  const exp = qEl.querySelector(".quiz-explain");
+  if (lastQuiz[qi]?.explain) {
+    exp.textContent = "💡 " + lastQuiz[qi].explain;
+    exp.classList.remove("hidden");
+  }
+  const wrap = els.summaryOutput.querySelector(".quiz-wrap");
+  const total = wrap.querySelectorAll(".quiz-q").length;
+  const done = wrap.querySelectorAll('.quiz-q[data-done="1"]').length;
+  const correctCount = wrap.querySelectorAll(".quiz-q .quiz-opt.correct").length;
+  const scoreEl = els.summaryOutput.querySelector("#quizScore");
+  if (done === total && scoreEl) {
+    scoreEl.classList.remove("hidden");
+    scoreEl.innerHTML = `🏁 نتيجتك: <b>${correctCount} / ${total}</b> ${
+      correctCount === total ? "— ممتاز! 🎉" : correctCount >= total / 2 ? "— جيد، راجع الأخطاء 💪" : "— تحتاج مراجعة الدرس 📖"
+    }`;
+    scoreEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+});
+
 /* ---------- المكتبة ---------- */
 
 function formatDate(iso) {
@@ -393,6 +487,7 @@ function suggestTitle(text) {
 els.saveBtn.addEventListener("click", () => {
   if (!lastSummary) return;
   els.saveTitleInput.value = suggestTitle(els.lessonText.value || lastSummary);
+  els.saveSubjectInput.value = localStorage.getItem("last_subject") || "";
   els.saveBar.classList.remove("hidden");
   els.saveTitleInput.focus();
 });
@@ -402,11 +497,13 @@ els.saveTitleInput.addEventListener("keydown", (e) => { if (e.key === "Enter") e
 els.saveConfirmBtn.addEventListener("click", async () => {
   if (!lastSummary) return;
   const title = els.saveTitleInput.value.trim() || suggestTitle(lastSummary);
+  const subject = els.saveSubjectInput.value.trim();
   try {
     await api("/library", {
       method: "POST",
-      body: JSON.stringify({ title, summary: lastSummary, lesson: els.lessonText.value.trim(), words: countWords(els.lessonText.value) }),
+      body: JSON.stringify({ title, summary: lastSummary, lesson: els.lessonText.value.trim(), words: countWords(els.lessonText.value), subject }),
     });
+    if (subject) localStorage.setItem("last_subject", subject);
     els.saveBar.classList.add("hidden");
     showStatus(`تم حفظ "${title}" ✓`, "success");
     loadLibrary();
@@ -421,25 +518,48 @@ async function loadLibrary() {
 }
 
 function renderLibrary(items) {
+  window._libItems = items;
   els.libCount.textContent = `${items.length} درس`;
   els.libraryEmpty.classList.toggle("hidden", items.length > 0);
   els.navLibCount.textContent = items.length;
   els.navLibCount.classList.toggle("hidden", items.length === 0);
-  els.libList.innerHTML = items
+
+  const subjects = [...new Set(items.map((it) => it.subject).filter(Boolean))];
+  els.libFilters.classList.toggle("hidden", subjects.length === 0);
+  if (!subjects.includes(currentLibFilter)) currentLibFilter = "";
+  els.libFilters.innerHTML =
+    `<button type="button" class="chip ${currentLibFilter === "" ? "active" : ""}" data-subject="">الكل (${items.length})</button>` +
+    subjects
+      .map((s) => {
+        const n = items.filter((it) => it.subject === s).length;
+        return `<button type="button" class="chip ${currentLibFilter === s ? "active" : ""}" data-subject="${escapeHtml(s)}">${escapeHtml(s)} (${n})</button>`;
+      })
+      .join("");
+
+  const visible = currentLibFilter ? items.filter((it) => it.subject === currentLibFilter) : items;
+  els.libList.innerHTML = visible
     .map((it) => `
       <li class="lib-item" data-id="${it.id}">
         <div class="lib-info">
           <span class="lib-title">${escapeHtml(it.title)}</span>
-          <span class="lib-meta">${formatDate(it.date)} • ${it.words} كلمة</span>
+          <span class="lib-meta">${it.subject ? `<span class="subject-tag">📘 ${escapeHtml(it.subject)}</span> • ` : ""}${formatDate(it.date)} • ${it.words} كلمة</span>
         </div>
         <div class="lib-actions">
-          <button type="button" data-action="view">👁️ عرض</button>
+          <button type="button" data-action="view" title="عرض">👁️</button>
+          <button type="button" data-action="quiz" title="اختبر نفسك">🧪</button>
           <button type="button" data-action="download" title="تنزيل">⬇️</button>
           <button type="button" data-action="delete" title="حذف">🗑️</button>
         </div>
       </li>`)
     .join("");
 }
+
+els.libFilters.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  currentLibFilter = chip.dataset.subject || "";
+  renderLibrary(window._libItems || []);
+});
 
 els.libList.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-action]");
@@ -451,6 +571,16 @@ els.libList.addEventListener("click", async (e) => {
       lastSummary = data.item.summary;
       renderSummary(lastSummary);
       showPage("summarize");
+    } else if (btn.dataset.action === "quiz") {
+      const data = await api(`/library/${id}`);
+      if (!data.item.lesson) {
+        showStatus("لا يوجد نص أصلي لهذا الدرس لإنشاء الأسئلة.", "error");
+        return;
+      }
+      els.lessonText.value = data.item.lesson;
+      els.wordCount.textContent = `${countWords(els.lessonText.value)} كلمة`;
+      showPage("summarize");
+      els.quizBtn.click();
     } else if (btn.dataset.action === "download") {
       const data = await api(`/library/${id}`);
       downloadText(data.item.title + ".txt", data.item.summary);
