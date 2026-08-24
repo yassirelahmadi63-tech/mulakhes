@@ -898,6 +898,48 @@ app.patch("/api/admin/users/:id/role", authAdmin, (req, res) => {
   res.json({ role: user.role });
 });
 
+/* ---------- صلاحيات إضافية للمدير ---------- */
+
+app.post("/api/admin/users/:id/password", authAdmin, async (req, res) => {
+  const target = data.users.find((u) => u.id === Number(req.params.id));
+  if (!target) return res.status(404).json({ error: "المستخدم غير موجود" });
+  const { password } = req.body || {};
+  if (!password || String(password).length < 6)
+    return res.status(400).json({ error: "كلمة المرور يجب أن تكون 6 أحرف على الأقل" });
+  target.password_hash = await bcrypt.hash(String(password), 10);
+  save();
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/users/:id/reset-free", authAdmin, (req, res) => {
+  const target = data.users.find((u) => u.id === Number(req.params.id));
+  if (!target) return res.status(404).json({ error: "المستخدم غير موجود" });
+  ensureFields(target);
+  target.free_usage = {};
+  target.sub_used = 0;
+  target.quiz_used = 0;
+  save();
+  res.json({ ok: true });
+});
+
+app.get("/api/admin/users/:id/library", authAdmin, (req, res) => {
+  const items = data.library
+    .filter((it) => it.user_id === Number(req.params.id))
+    .map(({ id, title, words, date, subject }) => ({ id, title, words, date, subject: subject || "" }))
+    .reverse();
+  res.json({ items });
+});
+
+app.get("/api/announcement", (req, res) => {
+  res.json({ text: data.announcement || "" });
+});
+
+app.post("/api/admin/announcement", authAdmin, (req, res) => {
+  data.announcement = String(req.body?.text || "").slice(0, 500);
+  save();
+  res.json({ ok: true });
+});
+
 /* ---------- الملفات الثابتة ---------- */
 app.use(express.static(path.join(__dirname, "public")));
 
