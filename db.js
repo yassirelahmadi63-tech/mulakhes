@@ -9,6 +9,7 @@ let data = {
   library: [],
   plans: [],
   requests: [],
+  payment_note: "",
   nextUserId: 1,
   nextLibId: 1,
   nextPlanId: 1,
