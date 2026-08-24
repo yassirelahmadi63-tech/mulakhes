@@ -182,6 +182,11 @@ input:focus, select:focus, textarea:focus {
 }
 .quiz-actions { margin-top: 14px; text-align: center; }
 
+/* قفل الاختبارات */
+.quiz-locked { text-align: center; padding: 40px 20px; }
+.quiz-locked .lock-icon { font-size: 3.5rem; margin-bottom: 10px; }
+.quiz-locked p { color: var(--muted); margin-bottom: 18px; font-size: 1rem; }
+
 /* ============ الامتحان القابل للطباعة ============ */
 .exam-topline { display: flex; justify-content: space-between; font-weight: 700; color: var(--muted); font-size: 0.9rem; }
 .exam-title { text-align: center; font-family: "Cairo", sans-serif; font-size: 1.4rem; font-weight: 900; margin: 12px 0; color: var(--primary-dark); }
