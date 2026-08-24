@@ -52,6 +52,7 @@ const els = {
   saveCancelBtn: $("saveCancelBtn"),
   copyBtn: $("copyBtn"),
   downloadBtn: $("downloadBtn"),
+  shareBtn: $("shareBtn"),
 
   libCount: $("libCount"),
   libraryEmpty: $("libraryEmpty"),
@@ -374,7 +375,7 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function renderSummary(markdown) {
+function mdToHtml(markdown) {
   const html = [];
   let inList = false;
   const inline = (s) =>
@@ -389,7 +390,11 @@ function renderSummary(markdown) {
     if (line.trim()) html.push(`<p>${inline(line)}</p>`);
   }
   if (inList) html.push("</ul>");
-  els.summaryOutput.innerHTML = html.join("");
+  return html.join("");
+}
+
+function renderSummary(markdown) {
+  els.summaryOutput.innerHTML = mdToHtml(markdown);
   els.resultCard.classList.remove("hidden");
 }
 
@@ -528,8 +533,10 @@ async function loadQuizPage() {
             <span class="lib-meta">${it.subject ? `<span class="subject-tag">📘 ${escapeHtml(it.subject)}</span> • ` : ""}${it.words} كلمة</span>
           </div>
           <div class="lib-actions">
-            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="quick">⚡ اختبار سريع</button>
-            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="exam">📄 امتحان كامل</button>
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="quick">⚡ اختبار</button>
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="cards">🃏 بطاقات</button>
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="plan">📅 خطة</button>
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="exam">📄 امتحان</button>
           </div>
         </li>`)
       .join("");
@@ -560,9 +567,18 @@ async function startQuizPage(item, mode) {
     quizPageItem = item;
     return;
   }
+  if (mode === "cards") {
+    await startFlashcards(item);
+    return;
+  }
+  if (mode === "plan") {
+    await askStudyPlan(item);
+    return;
+  }
   els.quizPicker.classList.add("hidden");
   els.quizPlayCard.classList.remove("hidden");
   els.quizPrintBtn.classList.remove("hidden");
+  document.body.classList.remove("print-exam");
   els.quizPlayTitle.textContent = `📄 امتحان كامل: ${item.title}`;
   els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء الامتحان... <span class="spinner"></span></p>';
 
@@ -574,17 +590,115 @@ async function startQuizPage(item, mode) {
     if (data.subscription) renderSubChip(data.subscription);
     renderExamPaper(data.questions, item);
   } catch (err) {
-    if (err.code === "QUOTA_LOCKED" || err.code === "QUOTA") {
-      els.quizPlayArea.innerHTML = `
-        <div class="quiz-locked">
-          <div class="lock-icon">🔒</div>
-          <p>${escapeHtml(err.message)}</p>
-          <button class="btn btn-primary" type="button" onclick="showPage('plans')">💳 عرض الباقات</button>
-        </div>`;
-    } else {
-      els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
-    }
+    renderStudyToolError(err);
   }
+}
+
+function renderStudyToolError(err) {
+  if (err.code === "QUOTA_LOCKED" || err.code === "QUOTA") {
+    els.quizPlayArea.innerHTML = `
+      <div class="quiz-locked">
+        <div class="lock-icon">🔒</div>
+        <p>${escapeHtml(err.message)}</p>
+        <button class="btn btn-primary" type="button" onclick="showPage('plans')">💳 عرض الباقات</button>
+      </div>`;
+  } else {
+    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+/* ---------- بطاقات الحفظ ---------- */
+
+async function startFlashcards(item) {
+  els.quizPicker.classList.add("hidden");
+  els.quizPlayCard.classList.remove("hidden");
+  els.quizPrintBtn.classList.add("hidden");
+  document.body.classList.remove("print-exam");
+  els.quizPlayTitle.textContent = `🃏 بطاقات الحفظ: ${item.title}`;
+  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء البطاقات... <span class="spinner"></span></p>';
+  try {
+    const data = await api("/flashcards", {
+      method: "POST",
+      body: JSON.stringify({ text: item.lesson }),
+    });
+    if (data.subscription) renderSubChip(data.subscription);
+    renderFlashcards(data.cards, item.title);
+  } catch (err) {
+    renderStudyToolError(err);
+  }
+}
+
+function renderFlashcards(cards, title) {
+  const cardsHtml = cards
+    .map(
+      (c, i) => `
+      <div class="fc-card" data-fc="${i}">
+        <div class="fc-inner">
+          <div class="fc-front"><small>سؤال ${i + 1}</small><p>${escapeHtml(c.front)}</p><span>اضغط لكشف الجواب</span></div>
+          <div class="fc-back"><small>الجواب</small><p>${escapeHtml(c.back)}</p></div>
+        </div>
+      </div>`
+    )
+    .join("");
+  els.quizPlayArea.innerHTML = `
+    <div class="fc-wrap">
+      <div class="quiz-head">🃏 اضغط على كل بطاقة لقلبها واحفظ</div>
+      <div class="fc-grid">${cardsHtml}</div>
+      <div class="quiz-actions">
+        <button type="button" class="btn btn-ghost" id="fcBackBtn">↩️ دروس أخرى</button>
+        <button type="button" class="btn btn-primary" id="fcRegenBtn">🔄 بطاقات أخرى</button>
+      </div>
+    </div>`;
+}
+
+document.addEventListener("click", (e) => {
+  const card = e.target.closest(".fc-card");
+  if (card) { card.classList.toggle("flipped"); return; }
+  if (e.target.id === "fcBackBtn") { els.quizExitBtn.click(); return; }
+  if (e.target.id === "fcRegenBtn" && quizPageItem) { startFlashcards(quizPageItem); }
+});
+
+/* ---------- خطة المذاكرة ---------- */
+
+async function askStudyPlan(item) {
+  els.quizPicker.classList.add("hidden");
+  els.quizPlayCard.classList.remove("hidden");
+  els.quizPrintBtn.classList.add("hidden");
+  document.body.classList.remove("print-exam");
+  els.quizPlayTitle.textContent = `📅 خطة مذاكرة: ${item.title}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const week = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  els.quizPlayArea.innerHTML = `
+    <div class="plan-ask">
+      <div class="quiz-head">📅 متى موعد امتحانك في هذه المادة؟</div>
+      <input type="date" id="examDateInput" value="${week}" min="${today}">
+      <button type="button" class="btn btn-primary btn-lg" id="planGoBtn">أنشئ خطة المذاكرة</button>
+    </div>`;
+  document.getElementById("planGoBtn").addEventListener("click", async () => {
+    const examDate = document.getElementById("examDateInput").value;
+    els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إعداد خطة المذاكرة... <span class="spinner"></span></p>';
+    try {
+      const data = await api("/studyplan", {
+        method: "POST",
+        body: JSON.stringify({ text: item.lesson, exam_date: examDate }),
+      });
+      if (data.subscription) renderSubChip(data.subscription);
+      els.quizPlayArea.innerHTML = `
+        <div class="summary-output">${mdToHtml(data.plan)}</div>
+        <div class="quiz-actions">
+          <button type="button" class="btn btn-ghost" id="planBackBtn">↩️ دروس أخرى</button>
+          <button type="button" class="btn btn-primary" id="planPrintBtn">🖨️ طباعة الخطة</button>
+        </div>`;
+      document.body.classList.add("print-exam");
+      document.getElementById("planBackBtn").addEventListener("click", () => {
+        document.body.classList.remove("print-exam");
+        els.quizExitBtn.click();
+      });
+      document.getElementById("planPrintBtn").addEventListener("click", () => window.print());
+    } catch (err) {
+      renderStudyToolError(err);
+    }
+  });
 }
 
 function renderExamPaper(questions, item) {
@@ -687,6 +801,7 @@ function renderLibrary(items) {
         <div class="lib-actions">
           <button type="button" data-action="view" title="عرض">👁️</button>
           <button type="button" data-action="quiz" title="اختبر نفسك">🧪</button>
+          <button type="button" data-action="share" title="مشاركة">🔗</button>
           <button type="button" data-action="download" title="تنزيل">⬇️</button>
           <button type="button" data-action="delete" title="حذف">🗑️</button>
         </div>
@@ -720,6 +835,9 @@ els.libList.addEventListener("click", async (e) => {
       }
       showPage("quiz");
       await startQuizPage(item, "quick");
+    } else if (btn.dataset.action === "share") {
+      const data = await api(`/library/${id}`);
+      await shareSummary(data.item.title, data.item.summary, data.item.subject);
     } else if (btn.dataset.action === "download") {
       const data = await api(`/library/${id}`);
       downloadText(data.item.title + ".txt", data.item.summary);
@@ -1052,6 +1170,35 @@ els.copyBtn.addEventListener("click", async () => {
 
 els.downloadBtn.addEventListener("click", () => {
   if (lastSummary) downloadText(`ملخص-${new Date().toISOString().slice(0, 10)}.txt`, lastSummary);
+});
+
+/* ---------- مشاركة الملخص ---------- */
+
+async function shareSummary(title, summary, subject) {
+  try {
+    const data = await api("/share", {
+      method: "POST",
+      body: JSON.stringify({ title, summary, subject }),
+    });
+    const link = `${location.origin}/s/${data.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "ملخص: " + title, text: "شاهد هذا الملخص:", url: link });
+      } else {
+        await navigator.clipboard.writeText(link);
+        showStatus("✓ تم نسخ رابط المشاركة — أرسله لصديقك", "success");
+      }
+    } catch {
+      showStatus("رابط المشاركة: " + link, "success");
+    }
+  } catch (err) {
+    showStatus(err.message, "error");
+  }
+}
+
+els.shareBtn.addEventListener("click", () => {
+  if (!lastSummary) return;
+  shareSummary(suggestTitle(els.lessonText.value || lastSummary), lastSummary, els.saveSubjectInput.value.trim());
 });
 
 if ("serviceWorker" in navigator) {
