@@ -73,6 +73,7 @@ const els = {
   planName: $("planName"),
   planDays: $("planDays"),
   planSummaries: $("planSummaries"),
+  planQuizzes: $("planQuizzes"),
   planModel: $("planModel"),
   planPrice: $("planPrice"),
   addPlanBtn: $("addPlanBtn"),
@@ -415,7 +416,16 @@ async function generateQuizIntoPage(text, title) {
     quizPageItem = null;
     renderQuiz(data.questions, els.quizPlayArea);
   } catch (err) {
-    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+    if (err.code === "QUOTA_LOCKED" || err.code === "QUOTA") {
+      els.quizPlayArea.innerHTML = `
+        <div class="quiz-locked">
+          <div class="lock-icon">🔒</div>
+          <p>${escapeHtml(err.message)}</p>
+          <button class="btn btn-primary" type="button" onclick="showPage('plans')">💳 عرض الباقات</button>
+        </div>`;
+    } else {
+      els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+    }
   }
 }
 
@@ -564,7 +574,16 @@ async function startQuizPage(item, mode) {
     if (data.subscription) renderSubChip(data.subscription);
     renderExamPaper(data.questions, item);
   } catch (err) {
-    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+    if (err.code === "QUOTA_LOCKED" || err.code === "QUOTA") {
+      els.quizPlayArea.innerHTML = `
+        <div class="quiz-locked">
+          <div class="lock-icon">🔒</div>
+          <p>${escapeHtml(err.message)}</p>
+          <button class="btn btn-primary" type="button" onclick="showPage('plans')">💳 عرض الباقات</button>
+        </div>`;
+    } else {
+      els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+    }
   }
 }
 
@@ -735,6 +754,12 @@ function renderPlansGrid(plans) {
     .map((p) => {
       const isCurrent = mySub?.active && mySub?.plan_id === p.id;
       const featured = (Number(p.price) || 0) === maxPrice && maxPrice > 0;
+      const qLine =
+        Number(p.quizzes) === 0
+          ? "<li>🔒 بدون اختبارات</li>"
+          : Number(p.quizzes) === -1
+            ? "<li>🧪 اختبارات غير محدودة</li>"
+            : `<li>🧪 ${p.quizzes} اختبارات</li>`;
       return `
       <div class="plan-card ${featured ? "featured" : ""} ${isCurrent ? "current" : ""}">
         ${featured ? '<span class="plan-badge">⭐ الأفضل قيمة</span>' : ""}
@@ -745,8 +770,8 @@ function renderPlansGrid(plans) {
         <ul class="plan-feats">
           <li>⏳ صلاحية ${p.days} يوم</li>
           <li>${p.summaries === -1 ? "♾️ ملخصات غير محدودة" : `📝 حتى ${p.summaries} ملخص`}</li>
+          ${qLine}
           <li>✓ حفظ في مكتبتك الخاصة</li>
-          <li>✓ مثالي للمراجعة قبل الامتحانات</li>
         </ul>
         <button class="btn ${featured ? "btn-primary" : "btn-ghost"} plan-cta" type="button" data-request-plan="${p.id}">${isCurrent ? "تجديد / تمديد" : "طلب اشتراك"}</button>
       </div>`;
@@ -862,10 +887,11 @@ els.addPlanBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         name, days: Number(els.planDays.value),
         summaries: els.planSummaries.value === "" ? -1 : Number(els.planSummaries.value),
+        quizzes: els.planQuizzes.value === "" ? -1 : Number(els.planQuizzes.value),
         price: els.planPrice.value.trim(), model: els.planModel.value,
       }),
     });
-    els.planName.value = els.planDays.value = els.planSummaries.value = els.planPrice.value = "";
+    els.planName.value = els.planDays.value = els.planSummaries.value = els.planQuizzes.value = els.planPrice.value = "";
     loadAdmin();
   } catch (err) { showStatus(err.message, "error"); }
 });
