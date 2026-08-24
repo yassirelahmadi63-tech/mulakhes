@@ -79,6 +79,13 @@ const els = {
   planPrice: $("planPrice"),
   addPlanBtn: $("addPlanBtn"),
   adminUsersBody: $("adminUsersBody"),
+  exportCsvBtn: $("exportCsvBtn"),
+  adminLibList: $("adminLibList"),
+  adminLibHint: $("adminLibHint"),
+  announcementAdmin: $("announcementAdmin"),
+  saveAnnBtn: $("saveAnnBtn"),
+  clearAnnBtn: $("clearAnnBtn"),
+  announcementBar: $("announcementBar"),
   paymentNoteAdmin: $("paymentNoteAdmin"),
   savePaymentBtn: $("savePaymentBtn"),
   paymentBox: $("paymentBox"),
@@ -94,6 +101,7 @@ let currentLibFilter = "";
 let modelLabels = {};
 let adminPlans = [];
 let mySub = null;
+let lastAdminUsers = [];
 
 /* رابط الخادم: فارغ = نفس المصدر (الويب)، أو رابط محفوظ (تطبيق الأندرويد) */
 const API_BASE = (localStorage.getItem("server_url") || "").replace(/\/+$/, "");
@@ -254,6 +262,7 @@ function enterApp(user, subscription) {
   els.app.classList.remove("hidden");
   els.adminOnlyBtns.forEach((b) => b.classList.toggle("hidden", user.role !== "admin"));
   loadLibrary();
+  loadAnnouncement();
   showPage("summarize");
 }
 
@@ -1082,6 +1091,7 @@ function subLabel(s) {
 }
 
 function renderAdminUsers(users) {
+  lastAdminUsers = users;
   const options = adminPlans.map((p) => `<option value="${p.id}">${escapeHtml(p.name)} (${p.days}ي)</option>`).join("");
   els.adminUsersBody.innerHTML = users
     .map((u) => `
@@ -1097,6 +1107,9 @@ function renderAdminUsers(users) {
           <button type="button" data-admin-action="unsubscribe" data-id="${u.id}">✗</button>
         </td>
         <td class="admin-actions">
+          <button type="button" data-admin-action="view-lib" data-id="${u.id}" title="مكتبته">📚</button>
+          <button type="button" data-admin-action="reset-free" data-id="${u.id}" title="تصفير الحصة">♻️</button>
+          <button type="button" data-admin-action="set-password" data-id="${u.id}" title="كلمة مرور جديدة">🔑</button>
           <button type="button" data-admin-action="toggle-role" data-id="${u.id}" title="تبديل الدور">🔁</button>
           <button type="button" data-admin-action="delete-user" data-id="${u.id}" title="حذف">🗑️</button>
         </td>
@@ -1146,10 +1159,83 @@ document.addEventListener("click", async (e) => {
       await api(`/admin/users/${id}/subscribe`, { method: "POST", body: JSON.stringify({ plan_id: Number(select.value) }) });
     } else if (btn.dataset.adminAction === "unsubscribe") {
       await api(`/admin/users/${id}/unsubscribe`, { method: "POST" });
+    } else if (btn.dataset.adminAction === "view-lib") {
+      const u = (lastAdminUsers || []).find((x) => String(x.id) === id);
+      const data = await api(`/admin/users/${id}/library`);
+      els.adminLibList.innerHTML = data.items
+        .map((it) => `
+          <li class="lib-item">
+            <div class="lib-info">
+              <span class="lib-title">${escapeHtml(it.title)}</span>
+              <span class="lib-meta">${it.subject ? escapeHtml(it.subject) + " • " : ""}${formatDate(it.date)} • ${it.words} كلمة</span>
+            </div>
+          </li>`)
+        .join("");
+      const empty = !data.items.length;
+      els.adminLibHint.textContent = empty
+        ? `لا توجد دروس في مكتبة ${u ? u.email : "هذا المستخدم"}.`
+        : `📚 دروس ${u ? u.email : ""}:`;
+      els.adminLibHint.classList.toggle("hidden", !empty);
+    } else if (btn.dataset.adminAction === "reset-free") {
+      if (!confirm("تصفير حصة هذا المستخدم (الملخصات والاختبارات)؟")) return;
+      await api(`/admin/users/${id}/reset-free`, { method: "POST" });
+    } else if (btn.dataset.adminAction === "set-password") {
+      const np = prompt("كلمة المرور الجديدة للمستخدم (6 أحرف على الأقل):");
+      if (!np) return;
+      await api(`/admin/users/${id}/password`, { method: "POST", body: JSON.stringify({ password: np }) });
+      showStatus("✓ تم تغيير كلمة المرور", "success");
     }
     loadAdmin();
   } catch (err) { showStatus(err.message, "error"); }
 });
+
+/* ---------- تصدير CSV + الإعلان ---------- */
+
+els.exportCsvBtn.addEventListener("click", () => {
+  if (!lastAdminUsers || !lastAdminUsers.length) return;
+  const rows = [["id", "name", "email", "role", "plan", "expires", "lessons"]];
+  lastAdminUsers.forEach((u) => {
+    rows.push([
+      u.id, u.name || "", u.email, u.role || "user",
+      u.subscription?.active ? u.subscription.plan_name : "free",
+      u.subscription?.expires || "", u.lessons,
+    ]);
+  });
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  downloadText("mulakhes-users.csv", csv);
+});
+
+els.saveAnnBtn.addEventListener("click", async () => {
+  try {
+    await api("/admin/announcement", { method: "POST", body: JSON.stringify({ text: els.announcementAdmin.value }) });
+    els.saveAnnBtn.textContent = "✓ نُشر";
+    setTimeout(() => (els.saveAnnBtn.textContent = "نشر الإعلان"), 2000);
+    loadAnnouncement();
+  } catch (err) { showStatus(err.message, "error"); }
+});
+
+els.clearAnnBtn.addEventListener("click", async () => {
+  try {
+    await api("/admin/announcement", { method: "POST", body: JSON.stringify({ text: "" }) });
+    els.announcementAdmin.value = "";
+    loadAnnouncement();
+  } catch (err) { showStatus(err.message, "error"); }
+});
+
+async function loadAnnouncement() {
+  try {
+    const data = await fetch("/api/announcement").then((r) => r.json());
+    if (data.text) {
+      els.announcementBar.textContent = "📢 " + data.text;
+      els.announcementBar.classList.remove("hidden");
+    } else {
+      els.announcementBar.classList.add("hidden");
+    }
+    if (currentUser?.role === "admin" && els.announcementAdmin && els.announcementAdmin.value === "") {
+      api("/admin/announcement").then((a) => (els.announcementAdmin.value = a.text || "")).catch(() => {});
+    }
+  } catch {}
+}
 
 /* ---------- نسخ/تنزيل + PWA ---------- */
 
