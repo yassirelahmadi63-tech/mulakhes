@@ -11,6 +11,7 @@ let data = {
   requests: [],
   shared: [],
   payment_note: "",
+  announcement: "",
   nextUserId: 1,
   nextLibId: 1,
   nextPlanId: 1,
