@@ -383,6 +383,19 @@ app.delete("/api/library/:id", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------- تعليمات الدفع ---------- */
+
+app.get("/api/payment-info", auth, (req, res) => {
+  ensureFields(req.userRow);
+  res.json({ note: data.payment_note || "" });
+});
+
+app.post("/api/admin/payment-info", authAdmin, (req, res) => {
+  data.payment_note = String(req.body?.note || "").slice(0, 1000);
+  save();
+  res.json({ ok: true });
+});
+
 /* ---------- الباقات وطلبات الاشتراك (للمستخدم) ---------- */
 
 app.get("/api/plans", auth, (req, res) => {
