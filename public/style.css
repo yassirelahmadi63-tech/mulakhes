@@ -315,6 +315,18 @@ input:focus, select:focus, textarea:focus {
 
 .main-content { flex: 1; padding: 30px 32px; max-width: 1200px; }
 
+/* إعلان المدير */
+.announcement {
+  background: linear-gradient(135deg, #fef9c3, #fef3c7);
+  border: 1.5px solid #fde047; color: #713f12;
+  border-radius: 14px; padding: 13px 18px; margin-bottom: 18px;
+  font-weight: 700; font-size: 0.95rem;
+  box-shadow: var(--shadow);
+}
+[data-theme="dark"] .announcement { background: linear-gradient(135deg, #2a2210, #1f1a0c); border-color: #a16207; color: #fde047; }
+
+.admin-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+
 .page { display: none; }
 .page.active { display: block; animation: fadeUp 0.3s ease; }
 
