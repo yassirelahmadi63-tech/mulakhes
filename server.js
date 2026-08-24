@@ -338,18 +338,113 @@ app.post("/api/summarize", auth, async (req, res) => {
   }
 });
 
+/* ---------- الاختبار الذاتي (أسئلة من الدرس) ---------- */
+
+app.post("/api/quiz", auth, async (req, res) => {
+  const u = req.userRow;
+  const info = subscriptionInfo(u);
+
+  if (info.active && info.remaining !== "∞" && info.remaining <= 0)
+    return res.status(402).json({
+      error: `انتهت حصة ملخصات اشتراك "${info.plan_name}". تواصل مع المدير للتجديد.`,
+      code: "QUOTA",
+    });
+  if (!info.active && info.remaining <= 0)
+    return res.status(402).json({
+      error: `انتهت حصتك المجانية (${FREE_MONTHLY_LIMIT} ملخصات شهرياً). اشترك للمتابعة!`,
+      code: "QUOTA",
+    });
+
+  const { text, count = 5 } = req.body || {};
+  if (!text || !text.trim())
+    return res.status(400).json({ error: "نص الدرس مطلوب" });
+  if (text.length > 60000)
+    return res.status(400).json({ error: "النص طويل جداً" });
+  if (!GROQ_API_KEY)
+    return res.status(500).json({ error: "الخادم غير مهيأ: مفقود GROQ_API_KEY" });
+
+  const qCount = Math.min(10, Math.max(3, Number(count) || 5));
+  const info2 = subscriptionInfo(u);
+  const usedModel = info2.active ? u.subscription.model || DEFAULT_MODEL : FREE_MODEL;
+
+  try {
+    const r = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: usedModel,
+        temperature: 0.5,
+        messages: [
+          {
+            role: "system",
+            content:
+              "أنت أستاذ خبير في إنشاء الأسئلة الاختبارية باللغة العربية. " +
+              `أنشئ ${qCount} أسئلة اختيار من متعدد على الدرس الذي سي أعطاك، بمستوى أكاديمي دقيق. ` +
+              'أعد النتيجة بصيغة JSON فقط دون أي نص إضافي أو ``` بهذا الشكل تماما: ' +
+              '{"questions":[{"q":"نص السؤال","options":["أ","ب","ج","د"],"answer":0,"explain":"شرح مختصر للجواب الصحيح"}]} ' +
+              "حيث answer هو رقم الخيار الصحيح (0 إلى 3). اجعل 4 خيارات لكل سؤال منطقية وقريبة من بعضها.",
+          },
+          { role: "user", content: `أنشئ الأسئلة من هذا الدرس:\n\n${text}` },
+        ],
+      }),
+    });
+
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      console.error("Groq quiz error:", r.status, errText.slice(0, 300));
+      return res.status(502).json({ error: `تعذر الاتصال بخدمة الذكاء الاصطناعي (${r.status})` });
+    }
+
+    const result = await r.json();
+    let raw = result.choices?.[0]?.message?.content?.trim() || "";
+    raw = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    raw = raw.replace(/```json|```/g, "").trim();
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    if (start === -1 || end === -1)
+      return res.status(502).json({ error: "صيغة الأسئلة غير صالحة، حاول مجدداً" });
+
+    let questions;
+    try {
+      questions = JSON.parse(raw.slice(start, end + 1)).questions;
+    } catch {
+      return res.status(502).json({ error: "تعذر تحليل الأسئلة، حاول مجدداً" });
+    }
+    if (!Array.isArray(questions) || !questions.length)
+      return res.status(502).json({ error: "لم تُنتج أسئلة، حاول مجدداً" });
+
+    /* خصم من الحصة بعد النجاح فقط */
+    if (info2.active && info2.remaining !== "∞") {
+      u.sub_used++;
+      save();
+    } else if (!info2.active) {
+      const mk = monthKey();
+      u.free_usage[mk] = (u.free_usage[mk] || 0) + 1;
+      save();
+    }
+
+    res.json({ questions, model_used: usedModel, subscription: subscriptionInfo(u) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "حدث خطأ أثناء إنشاء الأسئلة، حاول مجدداً" });
+  }
+});
+
 /* ---------- المكتبة لكل مستخدم ---------- */
 
 app.get("/api/library", auth, (req, res) => {
   const items = data.library
     .filter((it) => it.user_id === req.user.id)
-    .map(({ id, title, words, date }) => ({ id, title, words, date }))
+    .map(({ id, title, words, date, subject }) => ({ id, title, words, date, subject: subject || "" }))
     .reverse();
   res.json({ items });
 });
 
 app.post("/api/library", auth, (req, res) => {
-  const { title, summary, lesson, words } = req.body || {};
+  const { title, summary, lesson, words, subject } = req.body || {};
   if (!summary) return res.status(400).json({ error: "الملخص مطلوب" });
   const item = {
     id: data.nextLibId++,
@@ -358,6 +453,7 @@ app.post("/api/library", auth, (req, res) => {
     summary,
     lesson: lesson || "",
     words: Number(words) || 0,
+    subject: String(subject || "").slice(0, 30),
     date: new Date().toISOString(),
   };
   data.library.push(item);
