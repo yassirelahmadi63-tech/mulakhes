@@ -428,7 +428,7 @@ function renderQuiz(questions) {
     html.push("</div>");
   });
   html.push('<div id="quizScore" class="quiz-score hidden"></div>');
-  html.push('<div class="quiz-actions"><button type="button" class="btn btn-ghost" id="quizBackBtn">↩️ رجوع للملخص</button></div>');
+  html.push('<div class="quiz-actions"><button type="button" class="btn btn-ghost" id="quizBackBtn">↩️ رجوع للملخص</button> <button type="button" class="btn btn-primary" id="quizRegenBtn">🔄 أسئلة أخرى</button></div>');
   html.push("</div>");
   els.summaryOutput.innerHTML = html.join("");
   els.resultCard.classList.remove("hidden");
@@ -438,6 +438,10 @@ function renderQuiz(questions) {
 els.summaryOutput.addEventListener("click", (e) => {
   if (e.target.id === "quizBackBtn") {
     if (lastSummary) renderSummary(lastSummary);
+    return;
+  }
+  if (e.target.id === "quizRegenBtn") {
+    els.quizBtn.click();
     return;
   }
   const opt = e.target.closest(".quiz-opt");
@@ -579,6 +583,7 @@ els.libList.addEventListener("click", async (e) => {
       }
       els.lessonText.value = data.item.lesson;
       els.wordCount.textContent = `${countWords(els.lessonText.value)} كلمة`;
+      lastSummary = data.item.summary || "";
       showPage("summarize");
       els.quizBtn.click();
     } else if (btn.dataset.action === "download") {
