@@ -62,11 +62,12 @@ const GH_TOKEN = process.env.GITHUB_TOKEN || "";
 const GH_REPO = process.env.GITHUB_REPO || "";
 let syncTimer = null;
 let syncing = false;
+let lastSyncedContent = null;
 
 function scheduleGitHubSync() {
   if (!GH_TOKEN || !GH_REPO) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(syncToGitHub, 10000);
+  syncTimer = setTimeout(syncToGitHub, 60000);
 }
 
 async function syncToGitHub() {
@@ -75,6 +76,8 @@ async function syncToGitHub() {
   try {
     const content = fs.readFileSync(DATA_FILE);
     const b64 = content.toString("base64");
+    /* تخطَّ المزامنة إذا لم يتغير شيء منذ آخر مزامنة (لتجنب إعادة النشر بلا داعٍ) */
+    if (b64 === lastSyncedContent) return;
     const headers = {
       Authorization: `Bearer ${GH_TOKEN}`,
       "User-Agent": "mulakhes",
@@ -84,6 +87,10 @@ async function syncToGitHub() {
     const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/data.json`;
     const res = await fetch(apiUrl, { headers });
     const json = await res.json();
+    if (json.content && json.content.replace(/\n/g, "") === b64) {
+      lastSyncedContent = b64;
+      return;
+    }
     const body = {
       message: "sync data.json",
       content: b64,
@@ -96,7 +103,10 @@ async function syncToGitHub() {
       body: JSON.stringify(body),
     });
     if (!put.ok) console.error("GitHub sync failed:", put.status);
-    else console.log("✓ data.json synced to GitHub");
+    else {
+      lastSyncedContent = b64;
+      console.log("✓ data.json synced to GitHub");
+    }
   } catch (e) {
     console.error("GitHub sync error:", e.message);
   } finally {
