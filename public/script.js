@@ -863,38 +863,88 @@ function renderAdminPlans() {
       <li class="lib-item">
         <div class="lib-info">
           <span class="lib-title">💳 ${escapeHtml(p.name)}${p.price ? ` — ${escapeHtml(p.price)}` : ""}</span>
-          <span class="lib-meta">${p.days} يوم • ${p.summaries === -1 ? "∞ ملخص" : `${p.summaries} ملخص`} • 🤖 ${escapeHtml(p.model || "")}</span>
+          <span class="lib-meta">${p.days} يوم • ${p.summaries === -1 ? "∞ ملخص" : `${p.summaries} ملخص`} • ${Number(p.quizzes) === 0 ? "🔒 اختبارات" : Number(p.quizzes) === -1 ? "∞ اختبارات" : `${p.quizzes} اختبارات`} • 🤖 ${escapeHtml(p.model || "")}</span>
         </div>
-        <button type="button" class="btn-logout" data-plan-id="${p.id}">حذف</button>
+        <div class="lib-actions">
+          <button type="button" data-edit-plan="${p.id}" title="تعديل">✏️ تعديل</button>
+          <button type="button" class="btn-logout" data-plan-id="${p.id}">حذف</button>
+        </div>
       </li>`)
     .join("");
 }
 
 els.plansList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest("button[data-edit-plan]");
+  if (editBtn) { startEditPlan(editBtn.dataset.editPlan); return; }
   const btn = e.target.closest("button[data-plan-id]");
   if (!btn) return;
   if (!confirm("حذف هذه الخطة؟")) return;
-  try { await api(`/admin/plans/${btn.dataset.planId}`, { method: "DELETE" }); loadAdmin(); }
+  try { await api(`/admin/plans/${btn.dataset.planId}`, { method: "DELETE" }); resetPlanForm(); loadAdmin(); }
   catch (err) { showStatus(err.message, "error"); }
 });
+
+/* ---------- الوضع الليلي ---------- */
+
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("theme", t);
+  document.querySelectorAll(".theme-toggle").forEach((b) => {
+    b.textContent = t === "dark" ? "☀️ نهاري" : "🌙 ليلي";
+  });
+}
+applyTheme(localStorage.getItem("theme") || "light");
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".theme-toggle")) {
+    applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  }
+});
+
+/* ---------- تعديل الخطط ---------- */
+
+let editingPlanId = null;
+
+function startEditPlan(id) {
+  const p = adminPlans.find((x) => String(x.id) === String(id));
+  if (!p) return;
+  editingPlanId = p.id;
+  els.planName.value = p.name;
+  els.planDays.value = p.days;
+  els.planSummaries.value = Number(p.summaries) === -1 ? "" : p.summaries;
+  els.planQuizzes.value = p.quizzes === undefined || Number(p.quizzes) === -1 ? "" : p.quizzes;
+  els.planModel.value = p.model || "";
+  els.planPrice.value = p.price || "";
+  els.addPlanBtn.textContent = "💾 حفظ التعديلات";
+  els.addPlanBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+  els.planName.focus();
+}
+
+function resetPlanForm() {
+  editingPlanId = null;
+  els.planName.value = els.planDays.value = els.planSummaries.value = els.planQuizzes.value = els.planPrice.value = "";
+  els.addPlanBtn.textContent = "إضافة";
+}
 
 els.addPlanBtn.addEventListener("click", async () => {
   const name = els.planName.value.trim();
   if (!name || !els.planDays.value) return showStatus("أدخل اسم الخطة وعدد الأيام.", "error");
+  const payload = {
+    name, days: Number(els.planDays.value),
+    summaries: els.planSummaries.value === "" ? -1 : Number(els.planSummaries.value),
+    quizzes: els.planQuizzes.value === "" ? -1 : Number(els.planQuizzes.value),
+    price: els.planPrice.value.trim(), model: els.planModel.value,
+  };
   try {
-    await api("/admin/plans", {
-      method: "POST",
-      body: JSON.stringify({
-        name, days: Number(els.planDays.value),
-        summaries: els.planSummaries.value === "" ? -1 : Number(els.planSummaries.value),
-        quizzes: els.planQuizzes.value === "" ? -1 : Number(els.planQuizzes.value),
-        price: els.planPrice.value.trim(), model: els.planModel.value,
-      }),
-    });
-    els.planName.value = els.planDays.value = els.planSummaries.value = els.planQuizzes.value = els.planPrice.value = "";
+    if (editingPlanId) {
+      await api(`/admin/plans/${editingPlanId}`, { method: "PUT", body: JSON.stringify(payload) });
+    } else {
+      await api("/admin/plans", { method: "POST", body: JSON.stringify(payload) });
+    }
+    resetPlanForm();
     loadAdmin();
   } catch (err) { showStatus(err.message, "error"); }
 });
+
+/* ---------- الوضع الليلي نهاية ---------- */
 
 els.savePaymentBtn.addEventListener("click", async () => {
   try {
