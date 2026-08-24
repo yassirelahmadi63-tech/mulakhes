@@ -187,6 +187,34 @@ input:focus, select:focus, textarea:focus {
 .quiz-locked .lock-icon { font-size: 3.5rem; margin-bottom: 10px; }
 .quiz-locked p { color: var(--muted); margin-bottom: 18px; font-size: 1rem; }
 
+/* ============ بطاقات الحفظ ============ */
+.fc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.fc-card { perspective: 1000px; height: 210px; cursor: pointer; }
+.fc-inner {
+  position: relative; width: 100%; height: 100%;
+  transform-style: preserve-3d; transition: transform 0.5s;
+}
+.fc-card.flipped .fc-inner { transform: rotateY(180deg); }
+.fc-front, .fc-back {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  border-radius: 18px; padding: 18px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 8px;
+}
+.fc-front { background: #fff; border: 2px solid var(--primary); }
+.fc-front small, .fc-back small { font-size: 0.72rem; font-weight: 700; color: var(--muted); }
+.fc-front p { font-weight: 700; font-size: 1.02rem; }
+.fc-front span { font-size: 0.75rem; color: var(--muted); }
+.fc-back {
+  background: var(--grad); color: #fff; transform: rotateY(180deg);
+}
+.fc-back p { font-size: 0.98rem; }
+[data-theme="dark"] .fc-front { background: #10152c; }
+
+/* ============ خطة المذاكرة ============ */
+.plan-ask { max-width: 420px; margin: 0 auto; text-align: center; }
+.plan-ask input { margin-bottom: 12px; text-align: center; }
+
 /* ============ الامتحان القابل للطباعة ============ */
 .exam-topline { display: flex; justify-content: space-between; font-weight: 700; color: var(--muted); font-size: 0.9rem; }
 .exam-title { text-align: center; font-family: "Cairo", sans-serif; font-size: 1.4rem; font-weight: 900; margin: 12px 0; color: var(--primary-dark); }
