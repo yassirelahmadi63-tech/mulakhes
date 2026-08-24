@@ -363,7 +363,7 @@ app.post("/api/quiz", auth, async (req, res) => {
   if (!GROQ_API_KEY)
     return res.status(500).json({ error: "الخادم غير مهيأ: مفقود GROQ_API_KEY" });
 
-  const qCount = Math.min(10, Math.max(3, Number(count) || 5));
+  const qCount = Math.min(20, Math.max(3, Number(count) || 5));
   const info2 = subscriptionInfo(u);
   const usedModel = info2.active ? u.subscription.model || DEFAULT_MODEL : FREE_MODEL;
 
