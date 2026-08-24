@@ -500,8 +500,8 @@ app.post("/api/admin/payment-info", authAdmin, (req, res) => {
 
 app.get("/api/plans", auth, (req, res) => {
   res.json({
-    plans: data.plans.map(({ id, name, days, summaries, price, model }) => ({
-      id, name, days, summaries, price, model,
+    plans: data.plans.map(({ id, name, days, summaries, quizzes, price, model }) => ({
+      id, name, days, summaries, quizzes: quizzes === undefined ? -1 : quizzes, price, model,
     })),
   });
 });
@@ -612,6 +612,20 @@ app.post("/api/admin/plans", authAdmin, (req, res) => {
       : "openai/gpt-oss-20b",
   };
   data.plans.push(plan);
+  save();
+  res.json({ plan });
+});
+
+app.put("/api/admin/plans/:id", authAdmin, (req, res) => {
+  const plan = data.plans.find((p) => p.id === Number(req.params.id));
+  if (!plan) return res.status(404).json({ error: "الخطة غير موجودة" });
+  const b = req.body || {};
+  if (b.name !== undefined && String(b.name).trim()) plan.name = String(b.name).trim();
+  if (b.days !== undefined) plan.days = Math.max(1, Number(b.days) || plan.days);
+  if (b.summaries !== undefined) plan.summaries = b.summaries === "" || b.summaries === null ? -1 : Number(b.summaries);
+  if (b.quizzes !== undefined) plan.quizzes = b.quizzes === "" || b.quizzes === null ? -1 : Number(b.quizzes);
+  if (b.price !== undefined) plan.price = String(b.price ?? "").trim();
+  if (b.model !== undefined && AVAILABLE_MODELS.some((m) => m.id === b.model)) plan.model = b.model;
   save();
   res.json({ plan });
 });
