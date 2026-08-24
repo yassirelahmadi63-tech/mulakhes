@@ -164,6 +164,12 @@
             <span id="myQuota" class="badge"></span>
           </div>
           <p class="plans-intro">كل باقة أقوى ذكاءً من سابقتها. اختر باقة وأرسل طلبك، وسيراجعها المدير.</p>
+
+          <div id="paymentBox" class="payment-box hidden">
+            <b>💳 طريقة الدفع:</b>
+            <p id="paymentNote"></p>
+          </div>
+
           <div id="plansGrid" class="plans-grid"></div>
 
           <h3 class="admin-subtitle">📨 طلباتي</h3>
@@ -196,6 +202,10 @@
             <input type="text" id="planPrice" placeholder="السعر" maxlength="15" style="max-width:90px">
             <button id="addPlanBtn" class="btn btn-primary" type="button">إضافة</button>
           </div>
+
+          <h3 class="admin-subtitle">💰 تعليمات الدفع (تظهر للمشتركين)</h3>
+          <textarea id="paymentNoteAdmin" rows="3" placeholder="مثال: الدفع عبر Cash Plus باسم: فلان — هاتف: 06xxxxxxxx — بعد الدفع أرسل طلبك هنا"></textarea>
+          <button id="savePaymentBtn" class="btn btn-primary" type="button" style="margin-top:8px">حفظ التعليمات</button>
 
           <h3 class="admin-subtitle">👥 المستخدمون</h3>
           <div class="table-wrap">
