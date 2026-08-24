@@ -53,6 +53,55 @@ function save() {
   const tmp = DATA_FILE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
   fs.renameSync(tmp, DATA_FILE);
+  scheduleGitHubSync();
+}
+
+/* ---------- مزامنة البيانات مع GitHub (حتى لا تضيع على الاستضافة المجانية) ---------- */
+
+const GH_TOKEN = process.env.GITHUB_TOKEN || "";
+const GH_REPO = process.env.GITHUB_REPO || "";
+let syncTimer = null;
+let syncing = false;
+
+function scheduleGitHubSync() {
+  if (!GH_TOKEN || !GH_REPO) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncToGitHub, 10000);
+}
+
+async function syncToGitHub() {
+  if (syncing) { scheduleGitHubSync(); return; }
+  syncing = true;
+  try {
+    const content = fs.readFileSync(DATA_FILE);
+    const b64 = content.toString("base64");
+    const headers = {
+      Authorization: `Bearer ${GH_TOKEN}`,
+      "User-Agent": "mulakhes",
+      "Content-Type": "application/json",
+      Accept: "application/vnd.github+json",
+    };
+    const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/data.json`;
+    const res = await fetch(apiUrl, { headers });
+    const json = await res.json();
+    const body = {
+      message: "sync data.json",
+      content: b64,
+      sha: json.sha,
+      branch: "main",
+    };
+    const put = await fetch(apiUrl, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (!put.ok) console.error("GitHub sync failed:", put.status);
+    else console.log("✓ data.json synced to GitHub");
+  } catch (e) {
+    console.error("GitHub sync error:", e.message);
+  } finally {
+    syncing = false;
+  }
 }
 
 /* إنشاء حساب المدير تلقائياً عند التشغيل */
