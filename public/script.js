@@ -36,6 +36,14 @@ const els = {
   resultCard: $("resultCard"),
   summaryOutput: $("summaryOutput"),
   quizBtn: $("quizBtn"),
+  quizLibList: $("quizLibList"),
+  quizLibEmpty: $("quizLibEmpty"),
+  quizPlayCard: $("quizPlayCard"),
+  quizPicker: $("quizPicker"),
+  quizPlayTitle: $("quizPlayTitle"),
+  quizPlayArea: $("quizPlayArea"),
+  quizPrintBtn: $("quizPrintBtn"),
+  quizExitBtn: $("quizExitBtn"),
   libFilters: $("libFilters"),
   saveSubjectInput: $("saveSubjectInput"),
   saveBtn: $("saveBtn"),
@@ -118,6 +126,7 @@ function showPage(name) {
   if (name === "library") loadLibrary();
   if (name === "plans") loadPlansPage();
   if (name === "admin") loadAdmin();
+  if (name === "quiz") loadQuizPage();
 }
 
 els.navBtns.forEach((btn) =>
@@ -410,8 +419,9 @@ els.quizBtn.addEventListener("click", async () => {
   }
 });
 
-function renderQuiz(questions) {
+function renderQuiz(questions, target) {
   lastQuiz = questions;
+  target = target || els.summaryOutput;
   const html = [
     '<div class="quiz-wrap">',
     '<div class="quiz-head">🧪 اختبار ذاتي — أجب على جميع الأسئلة</div>',
@@ -430,20 +440,33 @@ function renderQuiz(questions) {
   html.push('<div id="quizScore" class="quiz-score hidden"></div>');
   html.push('<div class="quiz-actions"><button type="button" class="btn btn-ghost" id="quizBackBtn">↩️ رجوع للملخص</button> <button type="button" class="btn btn-primary" id="quizRegenBtn">🔄 أسئلة أخرى</button></div>');
   html.push("</div>");
-  els.summaryOutput.innerHTML = html.join("");
-  els.resultCard.classList.remove("hidden");
-  els.resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.innerHTML = html.join("");
+  if (target === els.summaryOutput) {
+    els.resultCard.classList.remove("hidden");
+    els.resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
-els.summaryOutput.addEventListener("click", (e) => {
-  if (e.target.id === "quizBackBtn") {
+document.addEventListener("click", (e) => {
+  const regen = e.target.id === "quizRegenBtn";
+  const back = e.target.id === "quizBackBtn";
+  if (!regen && !back) return;
+
+  /* داخل صفحة الاختبارات */
+  if (!els.quizPlayCard.classList.contains("hidden")) {
+    if (regen && quizPageItem) startQuizPage(quizPageItem, "quick");
+    else if (back) els.quizExitBtn.click();
+    return;
+  }
+
+  if (back) {
     if (lastSummary) renderSummary(lastSummary);
     return;
   }
-  if (e.target.id === "quizRegenBtn") {
-    els.quizBtn.click();
-    return;
-  }
+  if (regen) els.quizBtn.click();
+});
+
+els.summaryOutput.addEventListener("click", (e) => {
   const opt = e.target.closest(".quiz-opt");
   if (!opt || !lastQuiz) return;
   const qi = Number(opt.dataset.qi);
@@ -476,6 +499,100 @@ els.summaryOutput.addEventListener("click", (e) => {
     scoreEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 });
+
+/* ---------- صفحة الاختبارات ---------- */
+
+let quizPageItem = null;
+
+async function loadQuizPage() {
+  els.quizPicker.classList.remove("hidden");
+  els.quizPlayCard.classList.add("hidden");
+  els.quizPrintBtn.classList.add("hidden");
+  document.body.classList.remove("print-exam");
+  try {
+    const data = await api("/library");
+    window._libItems = data.items;
+    const usable = data.items.filter((it) => it.lesson);
+    els.quizLibEmpty.classList.toggle("hidden", usable.length > 0);
+    els.quizLibList.innerHTML = usable
+      .map((it) => `
+        <li class="lib-item">
+          <div class="lib-info">
+            <span class="lib-title">${escapeHtml(it.title)}</span>
+            <span class="lib-meta">${it.subject ? `<span class="subject-tag">📘 ${escapeHtml(it.subject)}</span> • ` : ""}${it.words} كلمة</span>
+          </div>
+          <div class="lib-actions">
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="quick">⚡ اختبار سريع</button>
+            <button type="button" class="quiz-mode" data-id="${it.id}" data-mode="exam">📄 امتحان كامل</button>
+          </div>
+        </li>`)
+      .join("");
+  } catch {}
+}
+
+els.quizLibList.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button.quiz-mode");
+  if (!btn) return;
+  const item = (window._libItems || []).find((it) => String(it.id) === btn.dataset.id);
+  if (!item) return;
+  await startQuizPage(item, btn.dataset.mode);
+});
+
+els.quizExitBtn.addEventListener("click", () => {
+  els.quizPlayCard.classList.add("hidden");
+  els.quizPicker.classList.remove("hidden");
+  els.quizPrintBtn.classList.add("hidden");
+  document.body.classList.remove("print-exam");
+});
+
+els.quizPrintBtn.addEventListener("click", () => window.print());
+
+async function startQuizPage(item, mode) {
+  quizPageItem = item;
+  els.quizPicker.classList.add("hidden");
+  els.quizPlayCard.classList.remove("hidden");
+  els.quizPrintBtn.classList.toggle("hidden", mode !== "exam");
+  els.quizPlayTitle.textContent = `${mode === "exam" ? "📄 امتحان" : "⚡ اختبار سريع"}: ${item.title}`;
+  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء الأسئلة... <span class="spinner"></span></p>';
+
+  try {
+    const data = await api("/quiz", {
+      method: "POST",
+      body: JSON.stringify({ text: item.lesson, count: mode === "exam" ? 15 : 5 }),
+    });
+    if (data.subscription) renderSubChip(data.subscription);
+    if (mode === "exam") renderExamPaper(data.questions, item);
+    else renderQuiz(data.questions, els.quizPlayArea);
+  } catch (err) {
+    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderExamPaper(questions, item) {
+  const letters = ["أ", "ب", "ج", "د"];
+  const rows = questions
+    .map((q, i) => {
+      const opts = (q.options || [])
+        .map((o, oi) => `<li>${escapeHtml(o)}</li>`)
+        .join("");
+      return `<li class="exam-q"><div class="exam-qtext">${i + 1}. ${escapeHtml(q.q)} <span class="exam-pts">(${2} ن)</span></div><ol type="A" class="exam-opts">${opts}</ol></li>`;
+    })
+    .join("");
+  const key = questions.map((q, i) => `<li>${i + 1} - ${letters[Number(q.answer)] || "?"}</li>`).join("");
+  els.quizPlayArea.innerHTML = `
+    <div class="exam-paper">
+      <div class="exam-header">
+        <div class="exam-topline"><span>المادة: ${escapeHtml(item.subject || "............")}</span><span>المدة: ساعة واحدة</span></div>
+        <h2 class="exam-title">امتحان: ${escapeHtml(item.title)}</h2>
+        <div class="exam-meta">الاسم: .............................. اللقب: .............................. القسم: ..............</div>
+      </div>
+      <ol class="exam-questions">${rows}</ol>
+      <div class="exam-key">
+        <h3>🔑 مفاتيح الأجوبة (للمصحح)</h3>
+        <ol class="exam-key-list">${key}</ol>
+      </div>
+    </div>`;
+}
 
 /* ---------- المكتبة ---------- */
 
