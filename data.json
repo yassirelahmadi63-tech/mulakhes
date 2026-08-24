@@ -18,6 +18,17 @@
       },
       "free_usage": {},
       "sub_used": 0
+    },
+    {
+      "id": 5,
+      "email": "yassirelahmadi63@gmail.com",
+      "password_hash": "$2a$10$psuZdKxb6ZP03DQwL2aj8O8JZuchmRH0wc0n8m8OrxWnbPIge4fmS",
+      "name": "",
+      "role": "user",
+      "subscription": null,
+      "free_usage": {},
+      "sub_used": 0,
+      "created_at": "2026-08-24T18:44:33.754Z"
     }
   ],
   "library": [],
@@ -48,7 +59,7 @@
     }
   ],
   "requests": [],
-  "nextUserId": 5,
+  "nextUserId": 6,
   "nextLibId": 4,
   "nextPlanId": 4,
   "nextRequestId": 1
