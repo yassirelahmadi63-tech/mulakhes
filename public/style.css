@@ -215,6 +215,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .plans-intro { color: var(--muted); font-size: 0.95rem; margin-bottom: 18px; }
 .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 
+.payment-box {
+  background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px;
+  padding: 14px 18px; margin-bottom: 20px; font-size: 0.95rem;
+}
+.payment-box b { color: #047857; }
+.payment-box p { white-space: pre-wrap; margin-top: 4px; }
+
 .plan-card {
   border: 2px solid var(--border); border-radius: 16px; padding: 22px;
   display: flex; flex-direction: column; gap: 6px; text-align: center;
