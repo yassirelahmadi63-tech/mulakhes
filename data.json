@@ -25,7 +25,15 @@
       "password_hash": "$2a$10$psuZdKxb6ZP03DQwL2aj8O8JZuchmRH0wc0n8m8OrxWnbPIge4fmS",
       "name": "",
       "role": "user",
-      "subscription": null,
+      "subscription": {
+        "plan_id": 2,
+        "plan_name": "شهري",
+        "days": 30,
+        "summaries": -1,
+        "model": "qwen/qwen3.6-27b",
+        "starts": "2026-08-24T18:46:04.012Z",
+        "expires": "2026-09-23T18:46:04.012Z"
+      },
       "free_usage": {},
       "sub_used": 0,
       "created_at": "2026-08-24T18:44:33.754Z"
@@ -64,7 +72,7 @@
       "user_id": 5,
       "plan_id": 2,
       "plan_name": "شهري",
-      "status": "pending",
+      "status": "approved",
       "date": "2026-08-24T18:45:43.389Z"
     }
   ],
