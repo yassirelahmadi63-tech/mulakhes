@@ -129,6 +129,7 @@
             <div class="card-head">
               <h2>💡 الملخص</h2>
               <div class="result-actions">
+                <button id="quizBtn" class="btn btn-ghost" type="button">🧪 اختبر نفسك</button>
                 <button id="saveBtn" class="btn btn-ghost" type="button">💾 حفظ</button>
                 <button id="copyBtn" class="btn btn-ghost" type="button">📋 نسخ</button>
                 <button id="downloadBtn" class="btn btn-ghost" type="button">⬇️ تنزيل</button>
@@ -136,6 +137,13 @@
             </div>
             <div id="saveBar" class="save-bar hidden">
               <input type="text" id="saveTitleInput" placeholder="اسم الدرس..." maxlength="80">
+              <input type="text" id="saveSubjectInput" placeholder="المادة (رياضيات، فيزياء...)" maxlength="30" list="subjectsList">
+              <datalist id="subjectsList">
+                <option>رياضيات</option><option>فيزياء</option><option>علوم الحياة والأرض</option>
+                <option>اللغة العربية</option><option>الفرنسية</option><option>الإنجليزية</option>
+                <option>التاريخ</option><option>الجغرافيا</option><option>الفلسفة</option>
+                <option>الاجتماعيات</option><option>الإعلاميات</option><option>التربية الإسلامية</option>
+              </datalist>
               <button id="saveConfirmBtn" class="btn btn-primary" type="button">تأكيد</button>
               <button id="saveCancelBtn" class="btn btn-ghost" type="button">إلغاء</button>
             </div>
@@ -151,6 +159,7 @@
             <h2>📚 مكتبتي</h2>
             <span id="libCount" class="badge">0 درس</span>
           </div>
+          <div id="libFilters" class="filter-chips hidden"></div>
           <p id="libraryEmpty" class="library-empty">لا توجد دروس محفوظة بعد.</p>
           <ul id="libList" class="lib-list"></ul>
         </div>
