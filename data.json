@@ -29,6 +29,17 @@
       "free_usage": {},
       "sub_used": 0,
       "created_at": "2026-08-24T18:44:33.754Z"
+    },
+    {
+      "id": 6,
+      "email": "ahmadijinan09@gmail.com",
+      "password_hash": "$2a$10$S8IxN111cBfK08S1PkT7W.SY5NAdEYp1LQ/rhWdGP6714FoeI6p4u",
+      "name": "Jinane",
+      "role": "user",
+      "subscription": null,
+      "free_usage": {},
+      "sub_used": 0,
+      "created_at": "2026-08-24T19:05:00.263Z"
     }
   ],
   "library": [],
@@ -68,7 +79,7 @@
       "date": "2026-08-24T18:45:43.389Z"
     }
   ],
-  "nextUserId": 6,
+  "nextUserId": 7,
   "nextLibId": 4,
   "nextPlanId": 4,
   "nextRequestId": 2
