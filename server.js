@@ -61,6 +61,7 @@ function ensureFields(u) {
   if (!("subscription" in u)) { u.subscription = null; dirty = true; }
   if (!("free_usage" in u)) { u.free_usage = {}; dirty = true; }
   if (!("sub_used" in u)) { u.sub_used = 0; dirty = true; }
+  if (!("quiz_used" in u)) { u.quiz_used = 0; dirty = true; }
   if (dirty) save();
   return u;
 }
@@ -76,12 +77,17 @@ function subscriptionInfo(u) {
   if (active) {
     const remaining =
       sub.summaries === -1 ? "∞" : Math.max(0, sub.summaries - u.sub_used);
+    let quizRemaining = "∞";
+    if (Number(sub.quizzes) === 0) quizRemaining = "locked";
+    else if (Number(sub.quizzes) !== -1)
+      quizRemaining = Math.max(0, sub.quizzes - (u.quiz_used || 0));
     return {
       active: true,
       plan_id: sub.plan_id,
       plan_name: sub.plan_name,
       expires: sub.expires,
       remaining,
+      quiz: quizRemaining,
       model: sub.model || null,
     };
   }
@@ -90,6 +96,7 @@ function subscriptionInfo(u) {
     plan_name: null,
     expires: null,
     remaining: Math.max(0, FREE_MONTHLY_LIMIT - (u.free_usage[monthKey()] || 0)),
+    quiz: "locked",
   };
 }
 
@@ -344,15 +351,16 @@ app.post("/api/quiz", auth, async (req, res) => {
   const u = req.userRow;
   const info = subscriptionInfo(u);
 
-  if (info.active && info.remaining !== "∞" && info.remaining <= 0)
+  /* الاختبارات: مقفلة على المجاني وباقات بدون اختبارات */
+  if (!info.active || info.quiz === "locked")
     return res.status(402).json({
-      error: `انتهت حصة ملخصات اشتراك "${info.plan_name}". تواصل مع المدير للتجديد.`,
-      code: "QUOTA",
+      error: "🔒 الاختبارات متاحة للمشتركين في الباقات التي تشملها — انتقل إلى الباقات",
+      code: "QUOTA_LOCKED",
     });
-  if (!info.active && info.remaining <= 0)
+  if (info.quiz !== "∞" && info.quiz <= 0)
     return res.status(402).json({
-      error: `انتهت حصتك المجانية (${FREE_MONTHLY_LIMIT} ملخصات شهرياً). اشترك للمتابعة!`,
-      code: "QUOTA",
+      error: `انتهت حصة الاختبارات في باقة "${info.plan_name}". جدّد أو ترقَّ لباقة أعلى.`,
+      code: "QUOTA_LOCKED",
     });
 
   const { text, count = 5 } = req.body || {};
@@ -416,13 +424,9 @@ app.post("/api/quiz", auth, async (req, res) => {
     if (!Array.isArray(questions) || !questions.length)
       return res.status(502).json({ error: "لم تُنتج أسئلة، حاول مجدداً" });
 
-    /* خصم من الحصة بعد النجاح فقط */
-    if (info2.active && info2.remaining !== "∞") {
-      u.sub_used++;
-      save();
-    } else if (!info2.active) {
-      const mk = monthKey();
-      u.free_usage[mk] = (u.free_usage[mk] || 0) + 1;
+    /* خصم من حصة الاختبارات بعد النجاح فقط */
+    if (info2.quiz !== "∞") {
+      u.quiz_used = (u.quiz_used || 0) + 1;
       save();
     }
 
@@ -564,11 +568,13 @@ app.post("/api/admin/requests/:id/approve", authAdmin, (req, res) => {
     plan_name: plan.name,
     days: plan.days,
     summaries: plan.summaries,
+    quizzes: plan.quizzes === undefined ? -1 : plan.quizzes,
     model: plan.model || DEFAULT_MODEL,
     starts: now.toISOString(),
     expires: expires.toISOString(),
   };
   target.sub_used = 0;
+  target.quiz_used = 0;
   request.status = "approved";
   save();
   res.json({ ok: true });
@@ -598,7 +604,8 @@ app.post("/api/admin/plans", authAdmin, (req, res) => {
     id: data.nextPlanId++,
     name: String(name).trim(),
     days: Math.max(1, Number(days) || 30),
-    summaries: summaries === undefined ? -1 : Number(summaries),
+    summaries: summaries === undefined || summaries === "" ? -1 : Number(summaries),
+    quizzes: req.body?.quizzes === undefined || req.body?.quizzes === "" ? -1 : Number(req.body.quizzes),
     price: String(price ?? "").trim(),
     model: model && AVAILABLE_MODELS.some((m) => m.id === model)
       ? model
@@ -638,11 +645,13 @@ app.post("/api/admin/users/:id/subscribe", authAdmin, (req, res) => {
     plan_name: plan.name,
     days: plan.days,
     summaries: plan.summaries,
+    quizzes: plan.quizzes === undefined ? -1 : plan.quizzes,
     model: plan.model || DEFAULT_MODEL,
     starts: now.toISOString(),
     expires: expires.toISOString(),
   };
   target.sub_used = 0;
+  target.quiz_used = 0;
   save();
   res.json({ subscription: subscriptionInfo(target) });
 });
