@@ -18,6 +18,9 @@ const els = {
   userName: $("userName"),
   subChip: $("subChip"),
   logoutBtn: $("logoutBtn"),
+  userNameM: $("userNameM"),
+  subChipM: $("subChipM"),
+  logoutBtnM: $("logoutBtnM"),
   navBtns: document.querySelectorAll(".nav-btn"),
   adminOnlyBtns: document.querySelectorAll(".admin-only"),
   navLibCount: $("navLibCount"),
@@ -203,14 +206,18 @@ async function initGoogleSignIn() {
 
 function renderSubChip(sub) {
   mySub = sub;
-  if (sub.active) {
-    const left = sub.remaining === "∞" ? "غير محدود" : `متبقي ${sub.remaining}`;
-    els.subChip.textContent = `⭐ ${sub.plan_name} • ${left}`;
-    els.subChip.className = "sub-chip sub-active";
-  } else {
-    els.subChip.textContent = `مجاني • متبقي ${sub.remaining}`;
-    els.subChip.className = "sub-chip sub-free";
-  }
+  const chips = [els.subChip, els.subChipM];
+  chips.forEach((chip) => {
+    if (!chip) return;
+    if (sub.active) {
+      const left = sub.remaining === "∞" ? "غير محدود" : `متبقي ${sub.remaining}`;
+      chip.textContent = `⭐ ${sub.plan_name} • ${left}`;
+      chip.className = "sub-chip sub-active";
+    } else {
+      chip.textContent = `مجاني • متبقي ${sub.remaining}`;
+      chip.className = "sub-chip sub-free";
+    }
+  });
   if (els.myQuota) {
     els.myQuota.textContent = sub.active
       ? `اشتراكك: ${sub.plan_name}`
@@ -220,7 +227,9 @@ function renderSubChip(sub) {
 
 function enterApp(user, subscription) {
   currentUser = user;
-  els.userName.textContent = user.name ? `👤 ${user.name}` : `👤 ${user.email.split("@")[0]}`;
+  const displayName = user.name ? `👤 ${user.name}` : `👤 ${user.email.split("@")[0]}`;
+  els.userName.textContent = displayName;
+  if (els.userNameM) els.userNameM.textContent = displayName;
   if (subscription) renderSubChip(subscription);
   els.authScreen.classList.add("hidden");
   els.app.classList.remove("hidden");
@@ -246,6 +255,12 @@ function logout() {
 }
 
 els.logoutBtn.addEventListener("click", logout);
+if (els.logoutBtnM) els.logoutBtnM.addEventListener("click", logout);
+
+/* داخل تطبيق الأندرويد: جوجل لا يعمل — أخفِ الزر ونبّه المستخدم */
+if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+  document.body.classList.add("native-app");
+}
 
 (async function init() {
   if (!token) {
