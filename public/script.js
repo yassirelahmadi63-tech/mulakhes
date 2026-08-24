@@ -43,6 +43,13 @@ const els = {
   quizPlayArea: $("quizPlayArea"),
   quizPrintBtn: $("quizPrintBtn"),
   quizExitBtn: $("quizExitBtn"),
+  fcLibList: $("fcLibList"),
+  fcLibEmpty: $("fcLibEmpty"),
+  fcPicker: $("fcPicker"),
+  fcPlayCard: $("fcPlayCard"),
+  fcPlayTitle: $("fcPlayTitle"),
+  fcPlayArea: $("fcPlayArea"),
+  fcExitBtn: $("fcExitBtn"),
   libFilters: $("libFilters"),
   saveSubjectInput: $("saveSubjectInput"),
   saveBtn: $("saveBtn"),
@@ -136,6 +143,7 @@ function showPage(name) {
   if (name === "plans") loadPlansPage();
   if (name === "admin") loadAdmin();
   if (name === "quiz") loadQuizPage();
+  if (name === "flash") loadFlashPage();
 }
 
 els.navBtns.forEach((btn) =>
@@ -603,28 +611,73 @@ async function startQuizPage(item, mode) {
   }
 }
 
-function renderStudyToolError(err) {
+function renderStudyToolError(err, area) {
+  const target = area || els.quizPlayArea;
   if (err.code === "QUOTA_LOCKED" || err.code === "QUOTA") {
-    els.quizPlayArea.innerHTML = `
+    target.innerHTML = `
       <div class="quiz-locked">
         <div class="lock-icon">🔒</div>
         <p>${escapeHtml(err.message)}</p>
         <button class="btn btn-primary" type="button" onclick="showPage('plans')">💳 عرض الباقات</button>
       </div>`;
   } else {
-    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
+    target.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
   }
 }
 
-/* ---------- بطاقات الحفظ ---------- */
+/* ---------- صفحة بطاقات الحفظ ---------- */
 
-async function startFlashcards(item) {
-  els.quizPicker.classList.add("hidden");
-  els.quizPlayCard.classList.remove("hidden");
-  els.quizPrintBtn.classList.add("hidden");
-  document.body.classList.remove("print-exam");
-  els.quizPlayTitle.textContent = `🃏 بطاقات الحفظ: ${item.title}`;
-  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء البطاقات... <span class="spinner"></span></p>';
+let fcUI = null;
+
+async function loadFlashPage() {
+  fcUI = null;
+  els.fcPicker.classList.remove("hidden");
+  els.fcPlayCard.classList.add("hidden");
+  try {
+    const data = await api("/library");
+    const usable = data.items.filter((it) => it.lesson);
+    els.fcLibEmpty.classList.toggle("hidden", usable.length > 0);
+    els.fcLibList.innerHTML = usable
+      .map((it) => `
+        <li class="lib-item">
+          <div class="lib-info">
+            <span class="lib-title">${escapeHtml(it.title)}</span>
+            <span class="lib-meta">${it.subject ? `<span class="subject-tag">📘 ${escapeHtml(it.subject)}</span> • ` : ""}${it.words} كلمة</span>
+          </div>
+          <div class="lib-actions">
+            <button type="button" class="fc-mode" data-id="${it.id}">🃏 إنشاء بطاقات</button>
+          </div>
+        </li>`)
+      .join("");
+  } catch {}
+}
+
+els.fcLibList.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button.fc-mode");
+  if (!btn) return;
+  const item = (window._libItems || []).find((it) => String(it.id) === btn.dataset.id);
+  if (!item) return;
+  await startFlashcards(item, {
+    area: els.fcPlayArea, title: els.fcPlayTitle,
+    picker: els.fcPicker, play: els.fcPlayCard, exit: els.fcExitBtn,
+  });
+});
+
+els.fcExitBtn.addEventListener("click", () => {
+  els.fcPlayCard.classList.add("hidden");
+  els.fcPicker.classList.remove("hidden");
+  loadFlashPage();
+});
+
+async function startFlashcards(item, ui) {
+  fcUI = ui || {
+    area: els.quizPlayArea, title: els.quizPlayTitle,
+    picker: els.quizPicker, play: els.quizPlayCard, exit: els.quizExitBtn,
+  };
+  fcUI.picker.classList.add("hidden");
+  fcUI.play.classList.remove("hidden");
+  fcUI.title.textContent = `🃏 بطاقات الحفظ: ${item.title}`;
+  fcUI.area.innerHTML = '<p class="library-empty">جارٍ إنشاء البطاقات... <span class="spinner"></span></p>';
   try {
     const data = await api("/flashcards", {
       method: "POST",
@@ -633,11 +686,11 @@ async function startFlashcards(item) {
     if (data.subscription) renderSubChip(data.subscription);
     renderFlashcards(data.cards, item.title);
   } catch (err) {
-    renderStudyToolError(err);
+    renderStudyToolError(err, fcUI.area);
   }
 }
 
-function renderFlashcards(cards, title) {
+function renderFlashcards(cards) {
   const cardsHtml = cards
     .map(
       (c, i) => `
@@ -649,7 +702,7 @@ function renderFlashcards(cards, title) {
       </div>`
     )
     .join("");
-  els.quizPlayArea.innerHTML = `
+  fcUI.area.innerHTML = `
     <div class="fc-wrap">
       <div class="quiz-head">🃏 اضغط على كل بطاقة لقلبها واحفظ</div>
       <div class="fc-grid">${cardsHtml}</div>
@@ -663,8 +716,8 @@ function renderFlashcards(cards, title) {
 document.addEventListener("click", (e) => {
   const card = e.target.closest(".fc-card");
   if (card) { card.classList.toggle("flipped"); return; }
-  if (e.target.id === "fcBackBtn") { els.quizExitBtn.click(); return; }
-  if (e.target.id === "fcRegenBtn" && quizPageItem) { startFlashcards(quizPageItem); }
+  if (e.target.id === "fcBackBtn" && fcUI) { fcUI.exit.click(); return; }
+  if (e.target.id === "fcRegenBtn" && quizPageItem) { startFlashcards(quizPageItem, fcUI); }
 });
 
 /* ---------- خطة المذاكرة ---------- */
