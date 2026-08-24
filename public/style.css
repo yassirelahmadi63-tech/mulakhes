@@ -182,6 +182,31 @@ input:focus, select:focus, textarea:focus {
 }
 .quiz-actions { margin-top: 14px; text-align: center; }
 
+/* ============ الامتحان القابل للطباعة ============ */
+.exam-topline { display: flex; justify-content: space-between; font-weight: 700; color: var(--muted); font-size: 0.9rem; }
+.exam-title { text-align: center; font-family: "Cairo", sans-serif; font-size: 1.4rem; font-weight: 900; margin: 12px 0; color: var(--primary-dark); }
+.exam-meta { text-align: center; font-size: 0.95rem; border: 1px dashed var(--border); border-radius: 10px; padding: 8px; margin-bottom: 16px; }
+.exam-questions { list-style: none; padding: 0; margin: 0; }
+.exam-q { margin-bottom: 18px; page-break-inside: avoid; }
+.exam-qtext { font-weight: 700; margin-bottom: 6px; }
+.exam-pts { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.exam-opts { list-style: none; padding-inline-start: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.exam-key { margin-top: 28px; border-top: 2px dashed var(--border); padding-top: 16px; page-break-before: always; }
+.exam-key h3 { font-family: "Cairo", sans-serif; color: var(--primary-dark); margin-bottom: 10px; }
+.exam-key-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; }
+.exam-key-list li { background: #f1f3f9; border: 1px solid var(--border); border-radius: 8px; padding: 4px 14px; font-weight: 700; }
+
+@media print {
+  body.print-exam { background: #fff; }
+  body.print-exam .sidebar,
+  body.print-exam .mobile-header,
+  body.print-exam .card-head,
+  body.print-exam .quiz-actions { display: none !important; }
+  body.print-exam .card { box-shadow: none; border: none; padding: 0; }
+  body.print-exam .main-content { padding: 0; max-width: 100%; }
+  body.print-exam .exam-key { page-break-before: always; }
+}
+
 /* ============ تصنيف المواد ============ */
 .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .filter-chips .chip {
