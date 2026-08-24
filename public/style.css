@@ -47,6 +47,16 @@ body {
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .google-btn-wrap { display: flex; justify-content: center; }
 
+/* داخل تطبيق الأندرويد: جوجل محجوب من WebView */
+body.native-app #googleSection { display: none !important; }
+body.native-app .native-note { display: block; }
+.native-note {
+  display: none;
+  background: #fffbeb; color: #92400e; border: 1px solid #fde68a;
+  border-radius: 10px; padding: 10px 14px; margin-top: 14px;
+  font-size: 0.85rem; text-align: center;
+}
+
 /* زر تحميل التطبيق */
 .apk-download {
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -245,21 +255,64 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .sub-manage { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sub-manage select { max-width: 140px; padding: 5px 8px; font-size: 0.85rem; }
 
-/* ============ الجوال ============ */
+/* ============ الجوال: شريط تنقل سفلي مثل التطبيقات ============ */
+.mobile-header { display: none; }
+
 @media (max-width: 900px) {
   .split { grid-template-columns: 1fr; }
+
   .app-layout { flex-direction: column; }
-  .sidebar {
-    width: 100%; height: auto; position: static;
-    flex-direction: row; align-items: center; gap: 8px;
-    border-inline-start: none; border-bottom: 1px solid var(--border);
-    padding: 10px 14px; overflow-x: auto;
+
+  .main-content {
+    padding: 12px 12px 96px;
+    width: 100%;
+    max-width: 100%;
   }
-  .sidebar-logo { padding: 0 8px; }
-  .side-nav { flex-direction: row; }
-  .nav-btn span { display: none; }
-  .nav-badge { position: absolute; transform: translate(-4px, -6px); }
-  .sidebar-user { border-top: none; padding-top: 0; flex-direction: row; align-items: center; margin-inline-start: auto; }
-  .side-user-name { display: none; }
-  .main-content { padding: 16px; }
+
+  /* ترويسة علوية صغيرة */
+  .mobile-header {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 12px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    flex-wrap: wrap;
+  }
+  .mobile-header .side-user-name { font-size: 0.85rem; }
+  .mobile-header .sub-chip { font-size: 0.72rem; }
+  .mobile-header .btn-logout { margin-inline-start: auto; padding: 5px 12px; font-size: 0.8rem; }
+
+  /* الشريط السفلي الثابت */
+  .sidebar {
+    position: fixed; bottom: 0; right: 0; left: 0;
+    width: 100%; height: calc(64px + env(safe-area-inset-bottom));
+    z-index: 500;
+    flex-direction: row; align-items: center;
+    padding: 4px 6px env(safe-area-inset-bottom);
+    background: #fff;
+    border-inline-start: none;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -3px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .sidebar-logo { display: none; }
+
+  .side-nav {
+    flex-direction: row; flex: 1;
+    justify-content: space-around; gap: 2px;
+  }
+
+  .nav-btn {
+    flex: 1; flex-direction: column; gap: 3px;
+    align-items: center; justify-content: center;
+    padding: 7px 2px; border-radius: 12px;
+    font-size: 1.25rem;
+  }
+  .nav-btn span {
+    display: block;
+    font-size: 0.62rem; font-weight: 700; line-height: 1;
+  }
+  .nav-btn.active { background: transparent; color: var(--primary); }
+  .nav-badge { position: absolute; transform: translate(10px, -8px); margin: 0; }
+
+  .sidebar-user { display: none; }
 }
