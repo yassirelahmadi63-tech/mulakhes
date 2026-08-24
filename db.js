@@ -27,10 +27,20 @@ if (fs.existsSync(DATA_FILE)) {
 /* خطط افتراضية عند أول تشغيل — كل خطة أغلى = موديل أقوى */
 if (!data.plans.length) {
   data.plans = [
-    { id: data.nextPlanId++, name: "تجريبي", days: 7, summaries: 20, price: "0", model: "openai/gpt-oss-20b" },
-    { id: data.nextPlanId++, name: "شهري", days: 30, summaries: -1, price: "15", model: "qwen/qwen3.6-27b" },
-    { id: data.nextPlanId++, name: "سنوي", days: 365, summaries: -1, price: "100", model: "openai/gpt-oss-120b" },
+    { id: data.nextPlanId++, name: "تجريبي", days: 7, summaries: 20, quizzes: 0, price: "0", model: "openai/gpt-oss-20b" },
+    { id: data.nextPlanId++, name: "شهري", days: 30, summaries: -1, quizzes: -1, price: "15", model: "qwen/qwen3.6-27b" },
+    { id: data.nextPlanId++, name: "سنوي", days: 365, summaries: -1, quizzes: -1, price: "100", model: "openai/gpt-oss-120b" },
   ];
+} else {
+  /* ترحيل: خطط قديمة بدون حقل الاختبارات */
+  let qMigrated = false;
+  data.plans.forEach((p) => {
+    if (p.quizzes === undefined) {
+      p.quizzes = p.name === "تجريبي" ? 0 : -1;
+      qMigrated = true;
+    }
+  });
+  if (qMigrated) save();
 }
 
 /* ترحيل: الخطط القديمة بدون موديل */
