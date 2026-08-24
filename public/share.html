@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ملخص مشترك | مُلخِّص الدروس</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Tajawal", sans-serif; background: #f6f7fb; color: #0f172a;
+      min-height: 100vh; line-height: 2; padding: 30px 16px;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    .card {
+      background: #fff; border: 1px solid #e6e9f2; border-radius: 20px;
+      box-shadow: 0 8px 30px rgba(15,23,42,.08); padding: 34px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px; justify-content: center;
+      font-family: "Cairo", sans-serif; font-weight: 900; font-size: 1.1rem;
+      background: linear-gradient(90deg,#4f46e5,#a855f7);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin-bottom: 18px; text-decoration: none;
+    }
+    h1 { font-family: "Cairo", sans-serif; font-size: 1.5rem; margin-bottom: 6px; }
+    .meta { color: #64748b; font-size: .85rem; margin-bottom: 20px; }
+    .subject { background: #eef2ff; color: #4338ca; border-radius: 999px; padding: 2px 12px; font-size: .8rem; font-weight: 700; }
+    .content { line-height: 2.1; font-size: 1.02rem; }
+    .content h3 { font-family: "Cairo", sans-serif; color: #4338ca; margin: 14px 0 6px; }
+    .content ul { padding-inline-start: 22px; }
+    .content strong { color: #3730a3; }
+    .cta {
+      display: block; text-align: center; margin-top: 26px;
+      background: linear-gradient(135deg,#4f46e5,#7c3aed); color: #fff;
+      text-decoration: none; font-weight: 700; border-radius: 12px; padding: 13px;
+    }
+    .err { text-align: center; color: #dc2626; font-weight: 700; padding: 40px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <a class="brand" href="/">📚 مُلخِّص الدروس</a>
+      <div id="content"><p class="err">جارٍ التحميل...</p></div>
+      <a class="cta" href="/">✨ لخّص دروسك مجاناً على مُلخِّص الدروس</a>
+    </div>
+  </div>
+  <script>
+    (async function () {
+      const id = location.pathname.split("/").pop();
+      try {
+        const r = await fetch("/api/share/" + id);
+        if (!r.ok) throw 0;
+        const d = await r.json();
+        document.title = d.title + " | مُلخِّص الدروس";
+        const md = d.summary;
+        let html = "";
+        let inList = false;
+        const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+        for (const line of md.split("\n")) {
+          const l = line.trimEnd();
+          const h = l.match(/^#{1,6}\s+(.*)$/);
+          if (h) { if (inList) { html += "</ul>"; inList = false; } html += "<h3>" + inline(h[1]) + "</h3>"; continue; }
+          const li = l.match(/^\s*([-*•]|\d+[.)])\s+(.*)$/);
+          if (li) { if (!inList) { html += "<ul>"; inList = true; } html += "<li>" + inline(li[2]) + "</li>"; continue; }
+          if (inList) { html += "</ul>"; inList = false; }
+          if (l.trim()) html += "<p>" + inline(l) + "</p>";
+        }
+        if (inList) html += "</ul>";
+        document.getElementById("content").innerHTML =
+          "<h1>" + esc(d.title) + "</h1>" +
+          '<div class="meta">' + (d.subject ? '<span class="subject">' + esc(d.subject) + "</span> • " : "") +
+          new Date(d.date).toLocaleDateString("ar") + "</div>" +
+          '<div class="content">' + html + "</div>";
+      } catch {
+        document.getElementById("content").innerHTML = '<p class="err">❌ الرابط غير صالح أو تم حذف الملخص</p>';
+      }
+    })();
+  </script>
+</body>
+</html>
