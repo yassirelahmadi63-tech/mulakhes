@@ -67,6 +67,10 @@ const els = {
   planPrice: $("planPrice"),
   addPlanBtn: $("addPlanBtn"),
   adminUsersBody: $("adminUsersBody"),
+  paymentNoteAdmin: $("paymentNoteAdmin"),
+  savePaymentBtn: $("savePaymentBtn"),
+  paymentBox: $("paymentBox"),
+  paymentNote: $("paymentNote"),
 };
 
 let token = localStorage.getItem("token") || "";
@@ -461,9 +465,17 @@ els.libList.addEventListener("click", async (e) => {
 
 async function loadPlansPage() {
   try {
-    const [plansRes, reqsRes] = await Promise.all([api("/plans"), api("/requests")]);
+    const [plansRes, reqsRes, payRes] = await Promise.all([
+      api("/plans"),
+      api("/requests"),
+      api("/payment-info"),
+    ]);
     renderPlansGrid(plansRes.plans);
     renderMyRequests(reqsRes.requests);
+    if (payRes.note) {
+      els.paymentNote.textContent = payRes.note;
+      els.paymentBox.classList.remove("hidden");
+    }
   } catch (err) { showStatus(err.message, "error"); }
 }
 
@@ -549,7 +561,12 @@ async function loadAdmin() {
       modelsRes.models.map((m) => `<option value="${m.id}">${m.id} (${m.label})</option>`).join("");
     renderAdminPlans();
 
-    const [usersRes, reqsRes] = await Promise.all([api("/admin/users"), api("/admin/requests")]);
+    const [usersRes, reqsRes, payRes] = await Promise.all([
+      api("/admin/users"),
+      api("/admin/requests"),
+      api("/payment-info"),
+    ]);
+    els.paymentNoteAdmin.value = payRes.note || "";
     renderAdminUsers(usersRes.users);
     renderAdminRequests(reqsRes.requests);
   } catch (err) {
@@ -592,6 +609,17 @@ els.addPlanBtn.addEventListener("click", async () => {
     });
     els.planName.value = els.planDays.value = els.planSummaries.value = els.planPrice.value = "";
     loadAdmin();
+  } catch (err) { showStatus(err.message, "error"); }
+});
+
+els.savePaymentBtn.addEventListener("click", async () => {
+  try {
+    await api("/admin/payment-info", {
+      method: "POST",
+      body: JSON.stringify({ note: els.paymentNoteAdmin.value }),
+    });
+    els.savePaymentBtn.textContent = "✓ تم الحفظ";
+    setTimeout(() => (els.savePaymentBtn.textContent = "حفظ التعليمات"), 2000);
   } catch (err) { showStatus(err.message, "error"); }
 });
 
