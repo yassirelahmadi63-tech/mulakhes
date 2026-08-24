@@ -35,7 +35,6 @@ const els = {
   statusMsg: $("statusMsg"),
   resultCard: $("resultCard"),
   summaryOutput: $("summaryOutput"),
-  quizBtn: $("quizBtn"),
   quizLibList: $("quizLibList"),
   quizLibEmpty: $("quizLibEmpty"),
   quizPlayCard: $("quizPlayCard"),
@@ -393,31 +392,32 @@ function renderSummary(markdown) {
   els.resultCard.classList.remove("hidden");
 }
 
-/* ---------- الاختبار الذاتي ---------- */
+/* ---------- الاختبار الذاتي (يظهر في صفحة الاختبارات) ---------- */
 
-els.quizBtn.addEventListener("click", async () => {
-  const text = els.lessonText.value.trim();
-  if (!text) return showStatus("لا يوجد نص درس لإنشاء الأسئلة.", "error");
-  els.quizBtn.disabled = true;
-  showStatus("جارٍ إنشاء الأسئلة...", "loading", true);
+let quizSourceText = "";
+let quizSourceTitle = "";
+
+async function generateQuizIntoPage(text, title) {
+  quizSourceText = text;
+  quizSourceTitle = title;
+  els.quizPicker.classList.add("hidden");
+  els.quizPlayCard.classList.remove("hidden");
+  els.quizPrintBtn.classList.add("hidden");
+  document.body.classList.remove("print-exam");
+  els.quizPlayTitle.textContent = `⚡ اختبار سريع: ${title}`;
+  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء الأسئلة... <span class="spinner"></span></p>';
   try {
     const data = await api("/quiz", {
       method: "POST",
       body: JSON.stringify({ text, count: 5 }),
     });
-    lastQuiz = data.questions;
     if (data.subscription) renderSubChip(data.subscription);
-    renderQuiz(data.questions);
-    showStatus(`تم إنشاء ${data.questions.length} أسئلة ✓ 🤖 ${data.model_used || ""}`, "success");
+    quizPageItem = null;
+    renderQuiz(data.questions, els.quizPlayArea);
   } catch (err) {
-    if (err.code === "QUOTA") {
-      showStatus(`⭐ ${err.message}`, "error");
-      showPage("plans");
-    } else showStatus(err.message, "error");
-  } finally {
-    els.quizBtn.disabled = false;
+    els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
   }
-});
+}
 
 function renderQuiz(questions, target) {
   lastQuiz = questions;
@@ -452,21 +452,17 @@ document.addEventListener("click", (e) => {
   const back = e.target.id === "quizBackBtn";
   if (!regen && !back) return;
 
-  /* داخل صفحة الاختبارات */
-  if (!els.quizPlayCard.classList.contains("hidden")) {
-    if (regen && quizPageItem) startQuizPage(quizPageItem, "quick");
-    else if (back) els.quizExitBtn.click();
-    return;
+  if (regen) generateQuizIntoPage(quizSourceText, quizSourceTitle);
+  else if (back) {
+    els.quizPlayCard.classList.add("hidden");
+    els.quizPicker.classList.remove("hidden");
+    els.quizPrintBtn.classList.add("hidden");
+    document.body.classList.remove("print-exam");
+    loadQuizPage();
   }
-
-  if (back) {
-    if (lastSummary) renderSummary(lastSummary);
-    return;
-  }
-  if (regen) els.quizBtn.click();
 });
 
-els.summaryOutput.addEventListener("click", (e) => {
+document.addEventListener("click", (e) => {
   const opt = e.target.closest(".quiz-opt");
   if (!opt || !lastQuiz) return;
   const qi = Number(opt.dataset.qi);
@@ -486,11 +482,11 @@ els.summaryOutput.addEventListener("click", (e) => {
     exp.textContent = "💡 " + lastQuiz[qi].explain;
     exp.classList.remove("hidden");
   }
-  const wrap = els.summaryOutput.querySelector(".quiz-wrap");
+  const wrap = opt.closest(".quiz-wrap");
   const total = wrap.querySelectorAll(".quiz-q").length;
   const done = wrap.querySelectorAll('.quiz-q[data-done="1"]').length;
   const correctCount = wrap.querySelectorAll(".quiz-q .quiz-opt.correct").length;
-  const scoreEl = els.summaryOutput.querySelector("#quizScore");
+  const scoreEl = wrap.querySelector("#quizScore");
   if (done === total && scoreEl) {
     scoreEl.classList.remove("hidden");
     scoreEl.innerHTML = `🏁 نتيجتك: <b>${correctCount} / ${total}</b> ${
@@ -549,20 +545,24 @@ els.quizPrintBtn.addEventListener("click", () => window.print());
 
 async function startQuizPage(item, mode) {
   quizPageItem = item;
+  if (mode === "quick") {
+    await generateQuizIntoPage(item.lesson, item.title);
+    quizPageItem = item;
+    return;
+  }
   els.quizPicker.classList.add("hidden");
   els.quizPlayCard.classList.remove("hidden");
-  els.quizPrintBtn.classList.toggle("hidden", mode !== "exam");
-  els.quizPlayTitle.textContent = `${mode === "exam" ? "📄 امتحان" : "⚡ اختبار سريع"}: ${item.title}`;
-  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء الأسئلة... <span class="spinner"></span></p>';
+  els.quizPrintBtn.classList.remove("hidden");
+  els.quizPlayTitle.textContent = `📄 امتحان كامل: ${item.title}`;
+  els.quizPlayArea.innerHTML = '<p class="library-empty">جارٍ إنشاء الامتحان... <span class="spinner"></span></p>';
 
   try {
     const data = await api("/quiz", {
       method: "POST",
-      body: JSON.stringify({ text: item.lesson, count: mode === "exam" ? 15 : 5 }),
+      body: JSON.stringify({ text: item.lesson, count: 15 }),
     });
     if (data.subscription) renderSubChip(data.subscription);
-    if (mode === "exam") renderExamPaper(data.questions, item);
-    else renderQuiz(data.questions, els.quizPlayArea);
+    renderExamPaper(data.questions, item);
   } catch (err) {
     els.quizPlayArea.innerHTML = `<p class="status error">${escapeHtml(err.message)}</p>`;
   }
@@ -693,16 +693,14 @@ els.libList.addEventListener("click", async (e) => {
       renderSummary(lastSummary);
       showPage("summarize");
     } else if (btn.dataset.action === "quiz") {
-      const data = await api(`/library/${id}`);
-      if (!data.item.lesson) {
+      const item = (window._libItems || []).find((it) => String(it.id) === id);
+      if (!item) return;
+      if (!item.lesson) {
         showStatus("لا يوجد نص أصلي لهذا الدرس لإنشاء الأسئلة.", "error");
         return;
       }
-      els.lessonText.value = data.item.lesson;
-      els.wordCount.textContent = `${countWords(els.lessonText.value)} كلمة`;
-      lastSummary = data.item.summary || "";
-      showPage("summarize");
-      els.quizBtn.click();
+      showPage("quiz");
+      await startQuizPage(item, "quick");
     } else if (btn.dataset.action === "download") {
       const data = await api(`/library/${id}`);
       downloadText(data.item.title + ".txt", data.item.summary);
