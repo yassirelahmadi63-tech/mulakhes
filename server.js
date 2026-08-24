@@ -437,6 +437,179 @@ app.post("/api/quiz", auth, async (req, res) => {
   }
 });
 
+/* ---------- أدوات دراسية: بطاقات + خطة مذاكرة (نفس صلاحية الاختبارات) ---------- */
+
+function quizAccess(res, u) {
+  const info = subscriptionInfo(u);
+  if (!info.active || info.quiz === "locked") {
+    res.status(402).json({
+      error: "🔒 هذه الأداة متاحة للمشتركين في الباقات التي تشملها — انتقل إلى الباقات",
+      code: "QUOTA_LOCKED",
+    });
+    return null;
+  }
+  if (info.quiz !== "∞" && info.quiz <= 0) {
+    res.status(402).json({
+      error: `انتهت حصة الأدوات الدراسية في باقة "${info.plan_name}". جدّد أو ترقَّ.`,
+      code: "QUOTA_LOCKED",
+    });
+    return null;
+  }
+  return info;
+}
+
+function deductQuizQuota(u, info) {
+  if (info.quiz !== "∞") {
+    u.quiz_used = (u.quiz_used || 0) + 1;
+    save();
+  }
+}
+
+async function groqJSON(systemPrompt, userPrompt, usedModel, res) {
+  const r = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: usedModel,
+      temperature: 0.5,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+  if (!r.ok) {
+    console.error("Groq error:", r.status);
+    res.status(502).json({ error: `تعذر الاتصال بخدمة الذكاء الاصطناعي (${r.status})` });
+    return null;
+  }
+  const result = await r.json();
+  let raw = result.choices?.[0]?.message?.content?.trim() || "";
+  raw = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  raw = raw.replace(/```json|```/g, "").trim();
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1) {
+    res.status(502).json({ error: "صيغة غير صالحة، حاول مجدداً" });
+    return null;
+  }
+  try {
+    return JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    res.status(502).json({ error: "تعذر تحليل النتيجة، حاول مجدداً" });
+    return null;
+  }
+}
+
+app.post("/api/flashcards", auth, async (req, res) => {
+  const u = req.userRow;
+  const info = quizAccess(res, u);
+  if (!info) return;
+
+  const { text } = req.body || {};
+  if (!text || !text.trim()) return res.status(400).json({ error: "نص الدرس مطلوب" });
+  if (!GROQ_API_KEY) return res.status(500).json({ error: "الخادم غير مهيأ" });
+
+  const usedModel = info.active ? u.subscription.model || DEFAULT_MODEL : FREE_MODEL;
+  const data = await groqJSON(
+    "أنت خبير في صناعة بطاقات الحفظ التعليمية (Flashcards) بالعربية. " +
+      'من الدرس المعطى أنشئ 8 بطاقات (سؤال/جواب) تغطي أهم النقاط للحفظ. ' +
+      'أعد JSON فقط دون أي نص إضافي: {"cards":[{"front":"سؤال قصير واضح","back":"جواب مركز"}]}',
+    `أنشئ البطاقات من هذا الدرس:\n\n${text}`,
+    usedModel,
+    res
+  );
+  if (!data) return;
+  if (!Array.isArray(data.cards) || !data.cards.length)
+    return res.status(502).json({ error: "لم تُنتج بطاقات، حاول مجدداً" });
+
+  deductQuizQuota(u, info);
+  res.json({ cards: data.cards, model_used: usedModel, subscription: subscriptionInfo(u) });
+});
+
+app.post("/api/studyplan", auth, async (req, res) => {
+  const u = req.userRow;
+  const info = quizAccess(res, u);
+  if (!info) return;
+
+  const { text, exam_date } = req.body || {};
+  if (!text || !text.trim()) return res.status(400).json({ error: "نص الدرس مطلوب" });
+  if (!GROQ_API_KEY) return res.status(500).json({ error: "الخادم غير مهيأ" });
+
+  const dateStr = exam_date
+    ? new Date(exam_date).toLocaleDateString("ar", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+    : "غير محدد";
+  const daysLeft = exam_date ? Math.max(1, Math.ceil((new Date(exam_date) - new Date()) / 86400000)) : 7;
+
+  const usedModel = info.active ? u.subscription.model || DEFAULT_MODEL : FREE_MODEL;
+  const r = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: usedModel,
+      temperature: 0.4,
+      messages: [
+        {
+          role: "system",
+          content:
+            "أنت مستشار تعليمي خبير في تنظيم وقت المذاكرة بالعربية. " +
+            `أنشئ خطة مراجعة يومية عملية حتى يوم الامتحان (تبقى ${daysLeft} أيام). ` +
+            "قسم الدرس إلى أجزاء وزّعها على الأيام مع أنشطة المراجعة والتلخيص والاختبار الذاتي. " +
+            "استخدم تنسيق ماركداون بسيط (**غامق** للعناوين وقوائم). كن واقعياً ومحفزاً.",
+        },
+        {
+          role: "user",
+          content: `تاريخ امتحاني: ${dateStr}\n\nأنشئ لي خطة مذاكرة لهذا الدرس:\n\n${text}`,
+        },
+      ],
+    }),
+  });
+
+  if (!r.ok) return res.status(502).json({ error: `تعذر الاتصال بخدمة الذكاء الاصطناعي (${r.status})` });
+  const result = await r.json();
+  let plan = result.choices?.[0]?.message?.content?.trim() || "";
+  plan = plan.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  if (!plan) return res.status(502).json({ error: "لم تُنتج خطة، حاول مجدداً" });
+
+  deductQuizQuota(u, info);
+  res.json({ plan, model_used: usedModel, subscription: subscriptionInfo(u) });
+});
+
+/* ---------- مشاركة الملخصات (روابط عامة) ---------- */
+
+app.post("/api/share", auth, (req, res) => {
+  const { title, summary, subject } = req.body || {};
+  if (!summary) return res.status(400).json({ error: "الملخص مطلوب" });
+  if (!data.shared) data.shared = [];
+  const id = crypto.randomBytes(8).toString("hex");
+  data.shared.push({
+    id,
+    user_id: req.user.id,
+    title: String(title || "ملخص مشترك").slice(0, 100),
+    summary,
+    subject: String(subject || "").slice(0, 30),
+    date: new Date().toISOString(),
+  });
+  save();
+  res.json({ id });
+});
+
+app.get("/api/share/:id", (req, res) => {
+  const s = (data.shared || []).find((x) => x.id === req.params.id);
+  if (!s) return res.status(404).json({ error: "الرابط غير صالح أو تم حذف الملخص" });
+  res.json({ title: s.title, summary: s.summary, subject: s.subject, date: s.date });
+});
+
+app.get("/s/:id", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "share.html"));
+});
+
 /* ---------- المكتبة لكل مستخدم ---------- */
 
 app.get("/api/library", auth, (req, res) => {
